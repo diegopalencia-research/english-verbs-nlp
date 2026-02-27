@@ -176,6 +176,7 @@ It also showed that **data science is a tool for understanding any domain** — 
 ## Author
 
 **Diego Palencia**
+
 Data-Driven Technical Specialist | Human Factors & Circadian Optimization Researcher | Python & AI Systems
 
 - GitHub: @diegopalencia-research https://github.com/diegopalencia-research
