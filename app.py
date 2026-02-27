@@ -317,7 +317,6 @@ elif page == "Full Verb Table":
                       'IPA_Base','IPA_Past','Vowel_Change']],
             use_container_width=True, height=500
         )
-```
 
 Click **Commit new file** at the bottom.
 
