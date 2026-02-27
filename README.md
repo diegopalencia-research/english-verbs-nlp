@@ -175,15 +175,14 @@ It also showed that **data science is a tool for understanding any domain** — 
 
 ## Author
 
-**Diego Palencia**
+**[Your Name]**
+Aspiring Data Scientist | English C2 Learner
 
-Data-Driven Technical Specialist | Human Factors & Circadian Optimization Researcher | Python & AI Systems
-
-- GitHub: @diegopalencia-research https://github.com/diegopalencia-research
-- LinkedIn: https://www.linkedin.com/in/diego-jose-palencia-robles/
+- GitHub: [@YOUR_USERNAME](https://github.com/YOUR_USERNAME)
+- LinkedIn: [your-linkedin](https://linkedin.com/in/your-linkedin)
 
 ---
 
 ## License
 
-MIT License - free to use, share, and modify with attribution.
+MIT License — free to use, share, and modify with attribution.
