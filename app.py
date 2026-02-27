@@ -1,7 +1,7 @@
+import json
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
@@ -14,6 +14,9 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# -------------------------
+# Styling (dark navy + fonts)
+# -------------------------
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap');
@@ -74,19 +77,6 @@ html, body, [class*="css"] {
     border: 1px solid #1E2535;
     border-radius: 4px;
     padding: 1rem;
-}
-[data-testid="metric-container"] label {
-    font-family: 'DM Mono', monospace !important;
-    font-size: 0.68rem !important;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: #4A5568 !important;
-}
-[data-testid="metric-container"] [data-testid="stMetricValue"] {
-    font-family: 'Syne', sans-serif !important;
-    font-size: 1.4rem !important;
-    font-weight: 700 !important;
-    color: #E8EAF0 !important;
 }
 [data-testid="stTextInput"] input {
     background: #0D1220 !important;
@@ -162,34 +152,69 @@ html, body, [class*="css"] {
 .stat-label { font-family:'DM Mono',monospace; font-size:0.65rem; letter-spacing:0.12em; text-transform:uppercase; color:#4A5568; }
 
 .pattern-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:0.8rem; margin-top:1rem; }
-.pattern-card { background:#0D1220; border:1px solid #1E2535; border-radius:4px; padding:0.9rem 1rem; }
+.pattern-card { background:#0D1220; border:1px solid #1E2535; border-radius:4px; padding:0.9rem 1rem; cursor:pointer; }
+.pattern-card:hover { border-color:#7EB8D4; transform:translateY(-3px); transition:all 0.15s; }
 .pattern-card-symbol { font-family:'DM Mono',monospace; font-size:0.78rem; color:#D4B87A; margin-bottom:0.3rem; }
 .pattern-card-count  { font-family:'Syne',sans-serif; font-size:1.4rem; font-weight:700; color:#E8EAF0; }
 .pattern-card-label  { font-family:'DM Mono',monospace; font-size:0.65rem; color:#4A5568; letter-spacing:0.08em; text-transform:uppercase; }
 .pattern-card-ex     { font-family:'DM Mono',monospace; font-size:0.65rem; color:#2A3348; margin-top:0.4rem; }
+.audio-note { font-family:'DM Mono',monospace; font-size:0.68rem; color:#4A5568; margin-top:0.4rem; }
+.button-inline { display:inline-block; margin-right:0.45rem; }
 </style>
 """, unsafe_allow_html=True)
 
 
-# ── Audio helper ──────────────────────────────────────────────────────────────
-def speak_button(word, label="", key=""):
-    safe_word = str(word).replace("'", "\\'").replace('"', '\\"')
-    btn_html = f"""
-    <button onclick="window.speechSynthesis.speak(Object.assign(new SpeechSynthesisUtterance('{safe_word}'),
-        {{lang:'en-US', rate:0.85, pitch:1}}))"
-      style="background:#0D1220; border:1px solid #1E2535; border-radius:3px;
-             color:#7EB8D4; font-family:'DM Mono',monospace; font-size:0.72rem;
-             letter-spacing:0.08em; padding:0.3rem 0.9rem; cursor:pointer;
-             transition:all 0.2s; margin:0.2rem 0.3rem 0.2rem 0;"
-      onmouseover="this.style.borderColor='#7EB8D4'"
-      onmouseout="this.style.borderColor='#1E2535'">
-      &#9654; {label or word}
-    </button>
+# -------------------------
+# Audio helper: single iframe with 3 play buttons (base, past, part)
+# -------------------------
+def speak_buttons(base, past=None, part=None, key=""):
     """
-    components.html(btn_html, height=44)
+    Renders a small HTML block (single components.html iframe) with up to three
+    play buttons that call the browser speechSynthesis. This avoids creating
+    multiple iframes for each button (which sometimes causes audio issues).
+    """
+    base_js = json.dumps(str(base))
+    past_js = json.dumps(str(past)) if past is not None else "null"
+    part_js = json.dumps(str(part)) if part is not None else "null"
+    uid = json.dumps(str(key or base + "_audio").replace(" ", "_"))
+
+    html = f"""
+    <div style="font-family:DM Mono,monospace;">
+      <div style="display:flex;gap:0.4rem;align-items:center;">
+        <button onclick="playText({base_js})" aria-label="Play base form"
+          style="background:#0D1220;border:1px solid #1E2535;border-radius:4px;
+                 color:#7EB8D4;font-family:DM Mono,monospace;padding:0.35rem 0.9rem;
+                 font-size:0.78rem;cursor:pointer;">&#9654; Base</button>
+        {"<button onclick=\"playText(" + past_js + ")\" aria-label=\"Play simple past\" style=\"background:#0D1220;border:1px solid #1E2535;border-radius:4px;color:#D48A90;font-family:DM Mono,monospace;padding:0.35rem 0.9rem;font-size:0.78rem;cursor:pointer;\">&#9654; Past</button>" if past is not None else ""}
+        {"<button onclick=\"playText(" + part_js + ")\" aria-label=\"Play past participle\" style=\"background:#0D1220;border:1px solid #1E2535;border-radius:4px;color:#D4B87A;font-family:DM Mono,monospace;padding:0.35rem 0.9rem;font-size:0.78rem;cursor:pointer;\">&#9654; Part</button>" if part is not None else ""}
+      </div>
+      <div class="audio-note">Uses your browser's speech engine — click a button to speak. If silent: ensure tab or site audio is not muted.</div>
+    </div>
+
+    <script>
+      function playText(text) {{
+        if (!text) return;
+        try {{
+          // create utterance with stable properties
+          const u = new SpeechSynthesisUtterance(text);
+          u.lang = 'en-US';
+          u.rate = 0.85;
+          u.pitch = 1.0;
+          window.speechSynthesis.cancel();
+          window.speechSynthesis.speak(u);
+        }} catch(e) {{
+          console.warn('Speech error', e);
+        }}
+      }}
+    </script>
+    """
+    # a slightly taller height accommodates the note text
+    components.html(html, height=80)
 
 
-# ── Data ──────────────────────────────────────────────────────────────────────
+# -------------------------
+# Data loading + feature extraction + model
+# -------------------------
 @st.cache_data
 def load_data():
     FILE = 'data/english_verbs.xlsx'
@@ -205,6 +230,12 @@ def load_data():
     df_irreg = df_irreg.dropna(subset=['Base']).reset_index(drop=True)
     df_reg['Type']   = 'Regular'
     df_irreg['Type'] = 'Irregular'
+    # ensure phonetic columns exist (fallback to IPA if missing)
+    for c in ['Phonetic_Base','Phonetic_Past','Phonetic_PP']:
+        if c not in df_reg.columns:
+            df_reg[c] = df_reg.get('IPA_Base', '')
+        if c not in df_irreg.columns:
+            df_irreg[c] = df_irreg.get('IPA_Base', '')
     return df_reg, df_irreg
 
 def extract_features(df):
@@ -229,9 +260,11 @@ def train_model(df_reg, df_irreg):
     rf.fit(X_tr, y_tr)
     return rf
 
+# load
 df_reg, df_irreg = load_data()
 model            = train_model(df_reg, df_irreg)
 
+# chart colors
 CHART_BG   = '#080C14'
 CHART_TEXT = '#6B7794'
 ACCENT1, ACCENT2, ACCENT3, ACCENT4 = '#7EB8D4', '#D48A90', '#D4B87A', '#8ECFB0'
@@ -260,8 +293,9 @@ PATTERN_EXAMPLES = {
     "oʊ → uː":       "know/knew · grow/grew · throw/threw",
 }
 
-
-# ── Sidebar ───────────────────────────────────────────────────────────────────
+# -------------------------
+# Sidebar with clearer description
+# -------------------------
 with st.sidebar:
     st.markdown("""
     <div style="padding:1rem 0 1.5rem 0;">
@@ -269,23 +303,41 @@ with st.sidebar:
                   text-transform:uppercase;color:#4A5568;margin-bottom:0.3rem;">Project</div>
       <div style="font-family:'Syne',sans-serif;font-size:1.1rem;font-weight:700;
                   color:#E8EAF0;line-height:1.3;">English Verb<br>Phonetics</div>
+      <div style="font-family:'DM Mono',monospace;font-size:0.68rem;color:#6B7794;margin-top:0.6rem;">
+        Use the search or Verb Lookup to inspect IPA, phonetic spellings and play audio (browser speech).
+      </div>
     </div>
     """, unsafe_allow_html=True)
 
-    page = st.radio("", ["/ Verb Lookup","/ Phonetic Explorer",
-                         "/ Charts & Analysis","/ Verb Reference"],
-                    label_visibility="collapsed")
+    page = st.radio("Navigate", ["/ Verb Lookup","/ Phonetic Explorer",
+                                 "/ Charts & Analysis","/ Verb Reference"],
+                    index=0)
 
-    st.markdown("<div style='margin-top:2rem;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='margin-top:1.6rem;'></div>", unsafe_allow_html=True)
     st.markdown(f"""
-    <div style="font-family:'DM Mono',monospace;font-size:0.7rem;color:#2A3348;line-height:2.2;">
+    <div style="font-family:'DM Mono',monospace;font-size:0.72rem;color:#4A5568;line-height:2.2;">
       <div style="color:#4A5568;letter-spacing:0.1em;text-transform:uppercase;
-                  font-size:0.62rem;margin-bottom:0.5rem;">Dataset</div>
+                  font-size:0.62rem;margin-bottom:0.4rem;">Dataset</div>
       <span style="color:#8ECFB0;">{len(df_reg)}</span> regular<br>
       <span style="color:#D48A90;">{len(df_irreg)}</span> irregular<br>
       <span style="color:#7EB8D4;">{len(df_reg)+len(df_irreg)}</span> total
     </div>
     """, unsafe_allow_html=True)
+
+
+# -------------------------
+# small helper: phonetic summary table for charts
+# -------------------------
+def phonetic_summary(df):
+    # counts for each phonetic column (top 8)
+    out = {}
+    for col in ['Phonetic_Base','Phonetic_Past','Phonetic_PP']:
+        if col in df.columns:
+            counts = df[col].value_counts().reset_index().rename(columns={'index':'phonetic','%s'%col:'count'})
+            out[col] = counts.head(8)
+        else:
+            out[col] = pd.DataFrame({'phonetic':[], 'count':[]})
+    return out
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -295,7 +347,7 @@ if page == "/ Verb Lookup":
     st.markdown('<div class="page-title">Verb Lookup</div>', unsafe_allow_html=True)
     st.markdown('<div class="page-subtitle">IPA · phonetics · audio · rule explanation</div>', unsafe_allow_html=True)
 
-    verb = st.text_input("", placeholder="Type a verb — walk, think, break, google...").lower().strip()
+    verb = st.text_input("", placeholder="Type a verb — e.g., walk, think, break (press Enter)").lower().strip()
 
     if not verb:
         st.markdown("""
@@ -320,12 +372,10 @@ if page == "/ Verb Lookup":
             c3.metric("Past Participle", row['Past_Participle'])
 
             st.markdown('<div class="section-label">Audio Pronunciation</div>', unsafe_allow_html=True)
-            ca, cb, cc = st.columns(3)
-            with ca: speak_button(str(row['Base']),            "Base form",       f"b{verb}")
-            with cb: speak_button(str(row['Simple_Past']),     "Simple past",     f"p{verb}")
-            with cc: speak_button(str(row['Past_Participle']), "Past participle", f"pp{verb}")
+            # render single iframe with three play buttons
+            speak_buttons(row['Base'], row['Simple_Past'], row['Past_Participle'], key=f"reg_{verb}")
 
-            st.markdown('<div class="section-label">IPA Transcription</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-label">IPA · Phonetic</div>', unsafe_allow_html=True)
             st.markdown(f"""
             <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1rem;">
               <div class="verb-card" style="flex:1;min-width:150px;">
@@ -350,8 +400,8 @@ if page == "/ Verb Lookup":
             """, unsafe_allow_html=True)
 
             st.markdown('<div class="section-label">Phonetic Rule</div>', unsafe_allow_html=True)
-            ending = row['Ending']
-            sound  = row['Last_Sound']
+            ending = row.get('Ending', '')
+            sound  = row.get('Last_Sound', '—')
             if ending == '/t/':
                 badge = '<span class="rule-badge badge-t">/t/</span>'
                 rule  = "Last sound is a <b>voiceless consonant</b> — -ed is pronounced as a sharp <b>/t/</b>, no extra syllable."
@@ -370,6 +420,7 @@ if page == "/ Verb Lookup":
             </div>
             """, unsafe_allow_html=True)
 
+
         elif not irreg_match.empty:
             row = irreg_match.iloc[0]
             st.markdown('<div class="section-label">Irregular Verb</div>', unsafe_allow_html=True)
@@ -380,12 +431,9 @@ if page == "/ Verb Lookup":
             c3.metric("Past Participle", row['Past_Participle'])
 
             st.markdown('<div class="section-label">Audio Pronunciation</div>', unsafe_allow_html=True)
-            ca, cb, cc = st.columns(3)
-            with ca: speak_button(str(row['Base']),            "Base form",       f"b{verb}")
-            with cb: speak_button(str(row['Simple_Past']),     "Simple past",     f"p{verb}")
-            with cc: speak_button(str(row['Past_Participle']), "Past participle", f"pp{verb}")
+            speak_buttons(row['Base'], row['Simple_Past'], row['Past_Participle'], key=f"irreg_{verb}")
 
-            st.markdown('<div class="section-label">IPA Transcription</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-label">IPA · Phonetic</div>', unsafe_allow_html=True)
             st.markdown(f"""
             <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1rem;">
               <div class="verb-card" style="flex:1;min-width:150px;">
@@ -410,7 +458,7 @@ if page == "/ Verb Lookup":
             """, unsafe_allow_html=True)
 
             st.markdown('<div class="section-label">Vowel Change Pattern</div>', unsafe_allow_html=True)
-            vc = row['Vowel_Change']
+            vc = row.get('Vowel_Change', '—')
             siblings = df_irreg[(df_irreg['Vowel_Change']==vc) & (df_irreg['Base']!=row['Base'])]['Base'].tolist()[:6]
             siblings_str = " &nbsp;&middot;&nbsp; ".join(siblings) if siblings else "—"
             ex = PATTERN_EXAMPLES.get(vc, "")
@@ -436,7 +484,8 @@ if page == "/ Verb Lookup":
             label    = 'Irregular' if prob[1] > 0.5 else 'Regular'
             conf     = max(prob) * 100
 
-            speak_button(verb, "Hear pronunciation", f"pred_{verb}")
+            # one-button fallback for predictions
+            speak_buttons(verb, None, None, key=f"pred_{verb}")
 
             if label == 'Regular':
                 last = verb[-1]
@@ -455,7 +504,6 @@ if page == "/ Verb Lookup":
                   <div style="font-family:'DM Mono',monospace;font-size:0.78rem;color:#8A9BB8;margin-top:0.5rem;">{rule}</div>
                 </div>
                 """, unsafe_allow_html=True)
-                speak_button(f"{verb}ed", "Hear predicted past", f"pred_past_{verb}")
             else:
                 st.markdown(f"""
                 <div class="verb-card">
@@ -507,27 +555,28 @@ elif page == "/ Phonetic Explorer":
                                      label_visibility="collapsed")
         ending_code = ending_filter.split(" ")[0]
         filtered = df_reg[df_reg['Ending']==ending_code][
-            ['Base','Simple_Past','IPA_Base','IPA_Past','Last_Sound','Ending']
+            ['Base','Simple_Past','Past_Participle','IPA_Base','IPA_Past','Phonetic_Base','Phonetic_Past','Phonetic_PP','Last_Sound','Ending']
         ].reset_index(drop=True)
         st.markdown(f'<div class="section-label">{len(filtered)} verbs</div>', unsafe_allow_html=True)
-        st.dataframe(filtered, use_container_width=True, height=380)
+        st.dataframe(filtered, use_container_width=True, height=420)
 
     with tab_irreg:
         st.markdown("""
         <div style="font-family:'DM Mono',monospace;font-size:0.8rem;color:#6B7794;
                     line-height:2;margin-bottom:1rem;">
           Irregular verbs form their past tense through internal vowel changes,
-          not by adding -ed. Click a pattern to filter the table.
+          not by adding -ed. Click a pattern card or choose one from the dropdown to filter.
         </div>
         """, unsafe_allow_html=True)
 
         vc_counts = df_irreg['Vowel_Change'].value_counts()
+        # pattern cards (clickable only for hover visual; selection via dropdown)
         cards_html = '<div class="pattern-grid">'
         for pattern, count in vc_counts.items():
             ex = PATTERN_EXAMPLES.get(pattern, "")
             short_ex = ex.split("·")[0].strip() if ex else ""
             cards_html += f"""
-            <div class="pattern-card">
+            <div class="pattern-card" title="Click dropdown to filter by this pattern">
               <div class="pattern-card-symbol">{pattern}</div>
               <div class="pattern-card-count">{count}</div>
               <div class="pattern-card-label">verbs</div>
@@ -536,16 +585,16 @@ elif page == "/ Phonetic Explorer":
         cards_html += '</div>'
         st.markdown(cards_html, unsafe_allow_html=True)
 
-        st.markdown('<div class="section-label" style="margin-top:2rem;">Filter by Pattern</div>',
+        st.markdown('<div class="section-label" style="margin-top:1.6rem;">Filter by Pattern</div>',
                     unsafe_allow_html=True)
         pattern_options = ["All patterns"] + vc_counts.index.tolist()
         selected = st.selectbox("", pattern_options, label_visibility="collapsed", key="explorer_irreg")
 
         if selected == "All patterns":
-            df_show = df_irreg[['Base','Simple_Past','Past_Participle','IPA_Base','IPA_Past','Vowel_Change']].copy()
+            df_show = df_irreg[['Base','Simple_Past','Past_Participle','IPA_Base','IPA_Past','Phonetic_Base','Phonetic_Past','Phonetic_PP','Vowel_Change']].copy()
         else:
             df_show = df_irreg[df_irreg['Vowel_Change']==selected][
-                ['Base','Simple_Past','Past_Participle','IPA_Base','IPA_Past','Vowel_Change']
+                ['Base','Simple_Past','Past_Participle','IPA_Base','IPA_Past','Phonetic_Base','Phonetic_Past','Phonetic_PP','Vowel_Change']
             ].copy()
             if selected in PATTERN_EXAMPLES:
                 st.markdown(f"""
@@ -555,7 +604,7 @@ elif page == "/ Phonetic Explorer":
                 </div>""", unsafe_allow_html=True)
 
         st.markdown(f'<div class="section-label">{len(df_show)} verbs</div>', unsafe_allow_html=True)
-        st.dataframe(df_show.reset_index(drop=True), use_container_width=True, height=360)
+        st.dataframe(df_show.reset_index(drop=True), use_container_width=True, height=420)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -563,7 +612,7 @@ elif page == "/ Phonetic Explorer":
 # ─────────────────────────────────────────────────────────────────────────────
 elif page == "/ Charts & Analysis":
     st.markdown('<div class="page-title">Charts & Analysis</div>', unsafe_allow_html=True)
-    st.markdown('<div class="page-subtitle">Patterns in 298 English verbs</div>', unsafe_allow_html=True)
+    st.markdown('<div class="page-subtitle">Patterns in English verbs (phonetic columns included)</div>', unsafe_allow_html=True)
 
     tab1, tab2, tab3, tab4 = st.tabs(["Overview","-ed Endings","Irregular Patterns","Verb Length"])
 
@@ -581,7 +630,17 @@ elif page == "/ Charts & Analysis":
         ax.tick_params(bottom=False)
         plt.tight_layout()
         st.pyplot(fig)
-        st.markdown('<div style="font-family:\'DM Mono\',monospace;font-size:0.75rem;color:#4A5568;margin-top:0.5rem;">The 10 most frequently used verbs in spoken English are all irregular: be, have, do, say, go, get, make, know, think, see.</div>', unsafe_allow_html=True)
+
+        # phonetic summary under the chart
+        st.markdown('<div class="section-label" style="margin-top:0.8rem;">Phonetic summary (top items)</div>', unsafe_allow_html=True)
+        ps_reg = phonetic_summary(df_reg)
+        ps_irreg = phonetic_summary(df_irreg)
+        st.markdown("<div style='display:flex;gap:1rem;'>", unsafe_allow_html=True)
+        st.dataframe(ps_reg['Phonetic_Base'].rename(columns={'phonetic':'phonetic','Phonetic_Base':'count'}).head(6),
+                     use_container_width=False, width=320, height=160)
+        st.dataframe(ps_irreg['Phonetic_Base'].rename(columns={'phonetic':'phonetic','Phonetic_Base':'count'}).head(6),
+                     use_container_width=False, width=320, height=160)
+        st.markdown("</div>", unsafe_allow_html=True)
 
     with tab2:
         ec = df_reg['Ending'].value_counts()
@@ -602,6 +661,11 @@ elif page == "/ Charts & Analysis":
         plt.tight_layout()
         st.pyplot(fig)
 
+        # include phonetic columns counts for regular verbs
+        st.markdown('<div class="section-label" style="margin-top:0.6rem;">Top phonetic spellings (regular)</div>', unsafe_allow_html=True)
+        st.dataframe(phonetic_summary(df_reg)['Phonetic_Base'].rename(columns={'phonetic':'phonetic','Phonetic_Base':'count'}).head(6),
+                     use_container_width=True, height=150)
+
     with tab3:
         vc = df_irreg['Vowel_Change'].value_counts().head(13)
         fig, ax = plt.subplots(figsize=(10, 5.5))
@@ -619,6 +683,10 @@ elif page == "/ Charts & Analysis":
         ax.set_yticklabels(vc.index[::-1], fontfamily='monospace', fontsize=8.5, color=CHART_TEXT)
         plt.tight_layout()
         st.pyplot(fig)
+
+        st.markdown('<div class="section-label" style="margin-top:0.6rem;">Phonetic examples for irregulars</div>', unsafe_allow_html=True)
+        st.dataframe(phonetic_summary(df_irreg)['Phonetic_Base'].rename(columns={'phonetic':'phonetic','Phonetic_Base':'count'}).head(8),
+                     use_container_width=True, height=150)
 
     with tab4:
         df_reg['length']   = df_reg['Base'].str.len()
@@ -647,34 +715,41 @@ elif page == "/ Charts & Analysis":
 # ─────────────────────────────────────────────────────────────────────────────
 elif page == "/ Verb Reference":
     st.markdown('<div class="page-title">Verb Reference</div>', unsafe_allow_html=True)
-    st.markdown('<div class="page-subtitle">Complete searchable table — 298 verbs</div>', unsafe_allow_html=True)
+    st.markdown('<div class="page-subtitle">Complete searchable table — phonetic columns included</div>', unsafe_allow_html=True)
 
     tab_r, tab_i = st.tabs(["Regular Verbs","Irregular Verbs"])
 
     with tab_r:
-        search = st.text_input("", placeholder="Search regular verbs...", key="s_reg")
+        search = st.text_input("", placeholder="Search regular verbs (base / phonetic) — press Enter", key="s_reg")
         df_show = df_reg.copy()
         if search:
-            df_show = df_show[df_show['Base'].str.contains(search.lower(), na=False)]
+            # search both Base and phonetic columns
+            mask = df_show['Base'].str.contains(search, case=False, na=False) | \
+                   df_show['Phonetic_Base'].str.contains(search, case=False, na=False) | \
+                   df_show['Phonetic_Past'].str.contains(search, case=False, na=False)
+            df_show = df_show[mask]
         st.markdown(f'<div class="section-label">{len(df_show)} verbs</div>', unsafe_allow_html=True)
         st.dataframe(df_show[['Base','Simple_Past','Past_Participle',
-                               'IPA_Base','IPA_Past','Last_Sound','Ending']].reset_index(drop=True),
+                               'IPA_Base','IPA_Past','Phonetic_Base','Phonetic_Past','Phonetic_PP','Last_Sound','Ending']].reset_index(drop=True),
                      use_container_width=True, height=520)
 
     with tab_i:
         cs, cf = st.columns([2,1])
         with cs:
-            search2 = st.text_input("", placeholder="Search irregular verbs...", key="s_irreg")
+            search2 = st.text_input("", placeholder="Search irregular verbs (base / pattern / phonetic)", key="s_irreg")
         with cf:
             vc_opts = ["All patterns"] + df_irreg['Vowel_Change'].value_counts().index.tolist()
             pat_filter = st.selectbox("", vc_opts, key="ref_irreg_filter",
                                       label_visibility="collapsed")
         df_show2 = df_irreg.copy()
         if search2:
-            df_show2 = df_show2[df_show2['Base'].str.contains(search2.lower(), na=False)]
+            mask = df_show2['Base'].str.contains(search2, case=False, na=False) | \
+                   df_show2['Phonetic_Base'].str.contains(search2, case=False, na=False) | \
+                   df_show2['Phonetic_Past'].str.contains(search2, case=False, na=False)
+            df_show2 = df_show2[mask]
         if pat_filter != "All patterns":
             df_show2 = df_show2[df_show2['Vowel_Change']==pat_filter]
         st.markdown(f'<div class="section-label">{len(df_show2)} verbs</div>', unsafe_allow_html=True)
         st.dataframe(df_show2[['Base','Simple_Past','Past_Participle',
-                                'IPA_Base','IPA_Past','Vowel_Change']].reset_index(drop=True),
+                                'IPA_Base','IPA_Past','Phonetic_Base','Phonetic_Past','Phonetic_PP','Vowel_Change']].reset_index(drop=True),
                      use_container_width=True, height=520)
