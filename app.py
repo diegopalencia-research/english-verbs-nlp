@@ -121,7 +121,7 @@ if page == "Verb Lookup":
             c4, c5, c6 = st.columns(3)
             c4.markdown(f"**IPA Base:** `{row['IPA_Base']}`")
             c5.markdown(f"**IPA Past:** `{row['IPA_Past']}`")
-            c6.markdown(f"**IPA PP:**   `{row['IPA_PP']}`")
+            c6.markdown(f"**IPA PP:** `{row['IPA_PP']}`")
 
             c7, c8, c9 = st.columns(3)
             c7.markdown(f"**Sound:** {row['Phonetic_Base']}")
@@ -134,15 +134,15 @@ if page == "Verb Lookup":
 
             if ending == '/t/':
                 st.info(f"**Last sound:** {sound}  \n"
-                        f"**Rule:** Voiceless consonant → -ed is pronounced **/t/**  \n"
+                        f"**Rule:** Voiceless consonant → -ed is pronounced **/t/** \n"
                         f"**Example:** walk → walk**t**")
             elif ending == '/d/':
                 st.info(f"**Last sound:** {sound}  \n"
-                        f"**Rule:** Voiced sound → -ed is pronounced **/d/**  \n"
+                        f"**Rule:** Voiced sound → -ed is pronounced **/d/** \n"
                         f"**Example:** call → call**d**")
             elif ending == '/ɪd/':
                 st.warning(f"**Last sound:** {sound}  \n"
-                           f"**Rule:** Ends in /t/ or /d/ → -ed adds **extra syllable /ɪd/**  \n"
+                           f"**Rule:** Ends in /t/ or /d/ → -ed adds **extra syllable /ɪd/** \n"
                            f"**Example:** start → start**id**")
 
         elif not irreg_match.empty:
@@ -158,7 +158,7 @@ if page == "Verb Lookup":
             c4, c5, c6 = st.columns(3)
             c4.markdown(f"**IPA Base:** `{row['IPA_Base']}`")
             c5.markdown(f"**IPA Past:** `{row['IPA_Past']}`")
-            c6.markdown(f"**IPA PP:**   `{row['IPA_PP']}`")
+            c6.markdown(f"**IPA PP:** `{row['IPA_PP']}`")
 
             st.markdown("#### Vowel Change Pattern")
             st.warning(f"**Pattern:** {row['Vowel_Change']}  \n"
@@ -317,18 +317,3 @@ elif page == "Full Verb Table":
                       'IPA_Base','IPA_Past','Vowel_Change']],
             use_container_width=True, height=500
         )
-
-Click **Commit new file** at the bottom.
-
----
-
-### STEP 2 — Add requirements.txt
-
-Make sure your `requirements.txt` in the repo contains exactly this:
-```
-pandas
-openpyxl
-matplotlib
-seaborn
-scikit-learn
-streamlit
