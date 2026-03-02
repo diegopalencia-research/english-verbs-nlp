@@ -486,7 +486,6 @@ if page == "/ Lookup":
             if verb_type == 'Regular':
                 ending = row['Ending']
                 sound  = row['Last_Sound']
-                bc = {'regular':'/t/':'b-t', '/d/':'b-d', '/ɪd/':'b-id'}.get(ending, 'b-reg')
                 rules = {
                     '/t/':  "Last sound is a <b>voiceless consonant</b> (p, k, f, s, sh, ch) — -ed is pronounced as a sharp <b>/t/</b>. No extra syllable.",
                     '/d/':  "Last sound is <b>voiced</b> (vowel, b, g, v, z, m, n, l, r) — -ed is pronounced as a soft <b>/d/</b>.",
