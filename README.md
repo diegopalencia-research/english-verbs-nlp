@@ -201,4 +201,4 @@ The call center context serves as an empirical domain for testing whether tempor
 
 ## License
 
-MIT License — free to use, share, and modify with attribution.
+MIT License
