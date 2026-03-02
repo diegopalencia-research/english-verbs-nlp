@@ -1,9 +1,3 @@
-"""
-app.py — English Verb Phonetics
-Full Stack NLP & Data Science Application
-github.com/diegopalencia-research/english-verbs-nlp
-"""
-
 import os
 import sys
 import json
