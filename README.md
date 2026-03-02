@@ -84,6 +84,7 @@ english-verbs-nlp/
 │   └── analysis.ipynb             Full EDA + ML notebook (16 cells)
 ├── README.md
 └── requirements.txt
+└── License.md
 ```
 
 ---
