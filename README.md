@@ -192,7 +192,7 @@ The call center context serves as an empirical domain for testing whether tempor
 ## Author
 
 **Diego José Palencia Robles**
-*Data Science & NLP Projects — Applied Linguistics + Machine Learning*
+*Data Science & NLP Projects — Applied AI & Analytics + Machine Learning*
 
 - GitHub; @diegopalencia-research: https://github.com/diegopalencia-research
 - LinkedIn: https://www.linkedin.com/in/diego-jose-palencia-robles/
