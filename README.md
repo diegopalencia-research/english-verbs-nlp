@@ -1,6 +1,6 @@
 # English Verb Phonetics — NLP & Data Science Analysis
 
-> A structured linguistic dataset of 300+ English verbs with IPA transcriptions, phonetic encodings, and past-tense pronunciation rules — analyzed through the lens of data science and NLP.
+> A structured linguistic dataset of 298 English verbs with IPA transcriptions, phonetic encodings, and past-tense pronunciation rules — analyzed through the lens of data science and NLP.
 
 ---
 
