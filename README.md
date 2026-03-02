@@ -176,6 +176,15 @@ It also showed that **data science is a tool for understanding any domain** — 
 
 ---
 
+## Research Connection
+
+This dashboard operationalizes findings from:
+> *Palencia, D. (2024). Computational Feature Extraction for Human Performance Prediction. OSF Preprints.*
+
+The call center context serves as an empirical domain for testing whether temporal and behavioral operational features can predict quality outcomes at the individual agent level — a research question extending the phonological prediction framework from Project 01.
+
+---
+
 **Live App:** https://english-verbs-nlp.streamlit.app/
 &nbsp;&nbsp;·&nbsp;&nbsp;
 **GitHub:** github.com/diegopalencia-research/english-verbs-nlp
