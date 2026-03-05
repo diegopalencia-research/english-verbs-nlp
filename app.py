@@ -369,6 +369,11 @@ SC_COLOR = {
     'Ambiguous':       C3,
 }
 
+# ── Load data & train model ────────────────────────────────────────────────────
+df_reg, df_irreg, df_part = load_data()
+model, METRICS, FEATURE_NAMES, misclassified_df = train_model_cached(df_reg, df_irreg)
+
+
 # ── Sidebar ────────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("""
@@ -1375,74 +1380,6 @@ elif page == "/ Model Performance":
     </div>
     """, unsafe_allow_html=True)
 
-
-# ═════════════════════════════════════════════════════════════════════════════
-# PAGE 6 — REFERENCE
-# ═════════════════════════════════════════════════════════════════════════════
-elif page == "/ Reference":
-    st.markdown('<div class="page-title">Verb Reference</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="page-sub">Complete searchable table — {len(df_reg)+len(df_irreg)} verbs · {len(df_part)} participial adjectives</div>', unsafe_allow_html=True)
-
-    t_r, t_i, t_p = st.tabs(["Regular Verbs", "Irregular Verbs", "Participial Adjectives"])
-
-    with t_r:
-        s = st.text_input("", placeholder="Search regular verbs...", key="s_r")
-        df_sh = df_reg.copy()
-        if s:
-            df_sh = df_sh[df_sh['Base'].str.contains(s.lower(), na=False)]
-        st.markdown(f'<span class="sec-label">{len(df_sh)} verbs</span>', unsafe_allow_html=True)
-        st.dataframe(
-            df_sh[['Base','Simple_Past','Past_Participle',
-                   'IPA_Base','IPA_Past','Last_Sound','Ending']].reset_index(drop=True),
-            use_container_width=True, height=520
-        )
-
-    with t_i:
-        cs, cf = st.columns([2, 1])
-        with cs:
-            s2 = st.text_input("", placeholder="Search irregular verbs...", key="s_i")
-        with cf:
-            vc_opts = ["All patterns"] + df_irreg['Vowel_Change'].value_counts().index.tolist()
-            pf = st.selectbox("", vc_opts, key="ref_pf", label_visibility="collapsed")
-
-        df_sh2 = df_irreg.copy()
-        if s2:
-            df_sh2 = df_sh2[df_sh2['Base'].str.contains(s2.lower(), na=False)]
-        if pf != "All patterns":
-            df_sh2 = df_sh2[df_sh2['Vowel_Change'] == pf]
-
-        st.markdown(f'<span class="sec-label">{len(df_sh2)} verbs</span>', unsafe_allow_html=True)
-        st.dataframe(
-            df_sh2[['Base','Simple_Past','Past_Participle',
-                    'IPA_Base','IPA_Past','Vowel_Change']].reset_index(drop=True),
-            use_container_width=True, height=520
-        )
-
-    with t_p:
-        cs3, cf3 = st.columns([2, 1])
-        with cs3:
-            s3 = st.text_input("", placeholder="Search participial adjectives...", key="s_p")
-        with cf3:
-            sc_opts = ["All classes"] + df_part['Semantic_Class'].value_counts().index.tolist()
-            sc_f = st.selectbox("", sc_opts, key="ref_sc", label_visibility="collapsed")
-
-        df_sh3 = df_part.copy()
-        if s3:
-            mask = (df_sh3['Base_Verb'].str.contains(s3.lower(), na=False) |
-                    df_sh3['Participial_Form'].str.contains(s3.lower(), na=False))
-            df_sh3 = df_sh3[mask]
-        if sc_f != "All classes":
-            df_sh3 = df_sh3[df_sh3['Semantic_Class'] == sc_f]
-
-        st.markdown(f'<span class="sec-label">{len(df_sh3)} entries</span>', unsafe_allow_html=True)
-        st.dataframe(
-            df_sh3[['Base_Verb','Participial_Form','IPA_Adj','Phonetic_Adj',
-                    'Semantic_Class','Example_Phrase','Notes']].reset_index(drop=True),
-            use_container_width=True, height=520
-        )
-
-# ─── Add to Model Performance page ────────────────────────────────────────────
-
 st.markdown('<span class="sec-label">Misclassification Analysis</span>',
             unsafe_allow_html=True)
 
@@ -1611,3 +1548,68 @@ with tab_fn:
                     'font-size:0.75rem;">No false negatives.</div>',
                     unsafe_allow_html=True)
 
+
+# ═════════════════════════════════════════════════════════════════════════════
+# PAGE 6 — REFERENCE
+# ═════════════════════════════════════════════════════════════════════════════
+elif page == "/ Reference":
+    st.markdown('<div class="page-title">Verb Reference</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="page-sub">Complete searchable table — {len(df_reg)+len(df_irreg)} verbs · {len(df_part)} participial adjectives</div>', unsafe_allow_html=True)
+
+    t_r, t_i, t_p = st.tabs(["Regular Verbs", "Irregular Verbs", "Participial Adjectives"])
+
+    with t_r:
+        s = st.text_input("", placeholder="Search regular verbs...", key="s_r")
+        df_sh = df_reg.copy()
+        if s:
+            df_sh = df_sh[df_sh['Base'].str.contains(s.lower(), na=False)]
+        st.markdown(f'<span class="sec-label">{len(df_sh)} verbs</span>', unsafe_allow_html=True)
+        st.dataframe(
+            df_sh[['Base','Simple_Past','Past_Participle',
+                   'IPA_Base','IPA_Past','Last_Sound','Ending']].reset_index(drop=True),
+            use_container_width=True, height=520
+        )
+
+    with t_i:
+        cs, cf = st.columns([2, 1])
+        with cs:
+            s2 = st.text_input("", placeholder="Search irregular verbs...", key="s_i")
+        with cf:
+            vc_opts = ["All patterns"] + df_irreg['Vowel_Change'].value_counts().index.tolist()
+            pf = st.selectbox("", vc_opts, key="ref_pf", label_visibility="collapsed")
+
+        df_sh2 = df_irreg.copy()
+        if s2:
+            df_sh2 = df_sh2[df_sh2['Base'].str.contains(s2.lower(), na=False)]
+        if pf != "All patterns":
+            df_sh2 = df_sh2[df_sh2['Vowel_Change'] == pf]
+
+        st.markdown(f'<span class="sec-label">{len(df_sh2)} verbs</span>', unsafe_allow_html=True)
+        st.dataframe(
+            df_sh2[['Base','Simple_Past','Past_Participle',
+                    'IPA_Base','IPA_Past','Vowel_Change']].reset_index(drop=True),
+            use_container_width=True, height=520
+        )
+
+    with t_p:
+        cs3, cf3 = st.columns([2, 1])
+        with cs3:
+            s3 = st.text_input("", placeholder="Search participial adjectives...", key="s_p")
+        with cf3:
+            sc_opts = ["All classes"] + df_part['Semantic_Class'].value_counts().index.tolist()
+            sc_f = st.selectbox("", sc_opts, key="ref_sc", label_visibility="collapsed")
+
+        df_sh3 = df_part.copy()
+        if s3:
+            mask = (df_sh3['Base_Verb'].str.contains(s3.lower(), na=False) |
+                    df_sh3['Participial_Form'].str.contains(s3.lower(), na=False))
+            df_sh3 = df_sh3[mask]
+        if sc_f != "All classes":
+            df_sh3 = df_sh3[df_sh3['Semantic_Class'] == sc_f]
+
+        st.markdown(f'<span class="sec-label">{len(df_sh3)} entries</span>', unsafe_allow_html=True)
+        st.dataframe(
+            df_sh3[['Base_Verb','Participial_Form','IPA_Adj','Phonetic_Adj',
+                    'Semantic_Class','Example_Phrase','Notes']].reset_index(drop=True),
+            use_container_width=True, height=520
+        )
