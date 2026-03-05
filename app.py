@@ -7,6 +7,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 import seaborn as sns
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split, cross_val_score
@@ -18,9 +19,10 @@ import streamlit.components.v1 as components
 
 # ── Local services ─────────────────────────────────────────────────────────────
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from services.lemmatizer   import find_verb, suggest_verbs
+from services.lemmatizer    import find_verb, suggest_verbs
 from services.preprocessing import extract_features, count_syllables, get_phonetic_category
-from services.phonetics    import predict_ending, get_rule_explanation
+from services.phonetics     import (predict_ending, get_rule_explanation,
+                                    get_semantic_class_info, adjective_test)
 
 # ── Page config ────────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -35,7 +37,6 @@ st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Syne:wght@400;600;700;800&display=swap');
 
-/* ── Reset ── */
 html, body, [class*="css"] {
     font-family: 'Syne', sans-serif;
     background: #060A10;
@@ -43,7 +44,6 @@ html, body, [class*="css"] {
 }
 .block-container { padding: 2.2rem 3rem 5rem; max-width: 1180px; }
 
-/* ── Sidebar ── */
 [data-testid="stSidebar"] {
     background: #080D18;
     border-right: 1px solid #131D2E;
@@ -59,7 +59,6 @@ html, body, [class*="css"] {
 }
 [data-testid="stSidebar"] .stRadio label:hover { color: #5B9EC9 !important; }
 
-/* ── Typography ── */
 .page-title {
     font-family: 'Syne', sans-serif;
     font-weight: 800;
@@ -86,8 +85,6 @@ html, body, [class*="css"] {
     margin: 1.8rem 0 0.7rem;
     display: block;
 }
-
-/* ── Cards ── */
 .card {
     background: #0B1120;
     border: 1px solid #131D2E;
@@ -129,8 +126,12 @@ html, body, [class*="css"] {
 .b-reg { background:rgba(82,180,130,0.08);  border:1px solid rgba(82,180,130,0.2);  color:#7DCBA8; }
 .b-inf { background:rgba(120,100,200,0.08); border:1px solid rgba(120,100,200,0.2); color:#A090D8; }
 .b-ok  { background:rgba(82,180,130,0.08);  border:1px solid rgba(82,180,130,0.2);  color:#7DCBA8; }
+.b-part{ background:rgba(160,144,216,0.08); border:1px solid rgba(160,144,216,0.2); color:#A090D8; }
+.b-emo { background:rgba(190,90,100,0.08);  border:1px solid rgba(190,90,100,0.2);  color:#C97080; }
+.b-phy { background:rgba(91,158,201,0.08);  border:1px solid rgba(91,158,201,0.2);  color:#5B9EC9; }
+.b-pro { background:rgba(82,180,130,0.08);  border:1px solid rgba(82,180,130,0.2);  color:#7DCBA8; }
+.b-amb { background:rgba(210,170,80,0.08);  border:1px solid rgba(210,170,80,0.2);  color:#C9A84C; }
 
-/* ── Metrics ── */
 [data-testid="metric-container"] {
     background: #0B1120;
     border: 1px solid #131D2E;
@@ -150,8 +151,6 @@ html, body, [class*="css"] {
     font-weight: 800 !important;
     color: #DCE0EA !important;
 }
-
-/* ── Inputs ── */
 [data-testid="stTextInput"] input {
     background: #0B1120 !important;
     border: 1px solid #131D2E !important;
@@ -167,8 +166,6 @@ html, body, [class*="css"] {
     border-color: #5B9EC9 !important;
     box-shadow: 0 0 0 1px rgba(91,158,201,0.12) !important;
 }
-
-/* ── Tabs ── */
 [data-testid="stTabs"] [data-baseweb="tab-list"] {
     border-bottom: 1px solid #131D2E;
     background: transparent;
@@ -188,12 +185,8 @@ html, body, [class*="css"] {
     color: #5B9EC9 !important;
     border-bottom: 1px solid #5B9EC9 !important;
 }
-
-/* ── Dataframe ── */
 [data-testid="stDataFrame"] { border: 1px solid #131D2E !important; border-radius: 3px; }
 [data-testid="stDataFrame"] * { font-family: 'DM Mono', monospace !important; font-size: 0.75rem !important; }
-
-/* ── Selectbox ── */
 [data-testid="stSelectbox"] > div > div {
     background: #0B1120 !important;
     border: 1px solid #131D2E !important;
@@ -201,29 +194,22 @@ html, body, [class*="css"] {
     font-size: 0.8rem !important;
     color: #DCE0EA !important;
 }
-
-/* ── Stat grid ── */
 .stat-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:0.8rem; margin-bottom:1.5rem; }
+.stat-grid-4 { display:grid; grid-template-columns:repeat(4,1fr); gap:0.8rem; margin-bottom:1.5rem; }
 .stat-block { background:#0B1120; border:1px solid #131D2E; border-radius:3px; padding:1rem 1.2rem; }
 .stat-num  { font-family:'Syne',sans-serif; font-size:1.9rem; font-weight:800; }
 .stat-lbl  { font-family:'DM Mono',monospace; font-size:0.6rem; letter-spacing:0.14em; text-transform:uppercase; color:#2E4060; margin-top:0.1rem; }
 .stat-sub  { font-family:'DM Mono',monospace; font-size:0.65rem; color:#1E3050; margin-top:0.4rem; }
-
-/* ── Pattern grid ── */
 .p-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(165px,1fr)); gap:0.7rem; margin:0.8rem 0 1.4rem; }
 .p-card { background:#0B1120; border:1px solid #131D2E; border-radius:3px; padding:0.85rem 1rem; }
 .p-sym  { font-family:'DM Mono',monospace; font-size:0.75rem; color:#C9A84C; margin-bottom:0.25rem; }
 .p-cnt  { font-family:'Syne',sans-serif; font-size:1.3rem; font-weight:700; color:#DCE0EA; }
 .p-lbl  { font-family:'DM Mono',monospace; font-size:0.6rem; color:#2E4060; text-transform:uppercase; letter-spacing:0.08em; }
 .p-ex   { font-family:'DM Mono',monospace; font-size:0.62rem; color:#1A2E46; margin-top:0.35rem; }
-
-/* ── Model dashboard ── */
 .metric-row { display:grid; grid-template-columns:repeat(4,1fr); gap:0.8rem; margin:1rem 0; }
 .m-block { background:#0B1120; border:1px solid #131D2E; border-radius:3px; padding:1.1rem; text-align:center; }
 .m-val  { font-family:'Syne',sans-serif; font-size:1.7rem; font-weight:800; }
 .m-lbl  { font-family:'DM Mono',monospace; font-size:0.6rem; color:#2E4060; text-transform:uppercase; letter-spacing:0.12em; margin-top:0.2rem; }
-
-/* ── Found form indicator ── */
 .found-in {
     font-family:'DM Mono',monospace;
     font-size:0.7rem;
@@ -232,11 +218,7 @@ html, body, [class*="css"] {
     text-transform:uppercase;
     margin-bottom:0.3rem;
 }
-
-/* ── Divider ── */
 .hr { border:none; border-top:1px solid #0F1A28; margin:1.5rem 0; }
-
-/* ── Progress bars (cv scores) ── */
 .cv-bar-wrap { margin: 0.4rem 0; }
 .cv-bar-lbl  { font-family:'DM Mono',monospace; font-size:0.65rem; color:#2E4060; margin-bottom:0.15rem; }
 .cv-bar-bg   { background:#0B1120; border:1px solid #131D2E; border-radius:2px; height:6px; width:100%; }
@@ -269,8 +251,9 @@ def speak_button(word: str, label: str = "", key: str = ""):
 @st.cache_data
 def load_data():
     FILE = 'data/english_verbs.xlsx'
-    df_reg   = pd.read_excel(FILE, sheet_name='Regular Verbs',   header=2)
-    df_irreg = pd.read_excel(FILE, sheet_name='Irregular Verbs', header=2)
+    df_reg   = pd.read_excel(FILE, sheet_name='Regular Verbs',          header=2)
+    df_irreg = pd.read_excel(FILE, sheet_name='Irregular Verbs',        header=2)
+    df_part  = pd.read_excel(FILE, sheet_name='Participial Adjectives', header=2)
 
     reg_cols = ['Base','Simple_Past','Past_Participle',
                 'IPA_Base','IPA_Past','IPA_PP',
@@ -280,13 +263,20 @@ def load_data():
                   'IPA_Base','IPA_Past','IPA_PP',
                   'Phonetic_Base','Phonetic_Past','Phonetic_PP',
                   'Vowel_Change']
+    part_cols = ['Base_Verb','Participial_Form','IPA_Base','IPA_Adj',
+                 'Phonetic_Adj','Semantic_Class','Example_Phrase','Notes']
+
     df_reg.columns   = reg_cols
     df_irreg.columns = irreg_cols
+    df_part.columns  = part_cols
+
     df_reg   = df_reg.dropna(subset=['Base']).reset_index(drop=True)
     df_irreg = df_irreg.dropna(subset=['Base']).reset_index(drop=True)
+    df_part  = df_part.dropna(subset=['Base_Verb']).reset_index(drop=True)
+
     df_reg['Type']   = 'Regular'
     df_irreg['Type'] = 'Irregular'
-    return df_reg, df_irreg
+    return df_reg, df_irreg, df_part
 
 
 @st.cache_resource
@@ -330,12 +320,12 @@ def train_model_cached(df_reg, df_irreg):
     return model, metrics, X.columns.tolist()
 
 
-df_reg, df_irreg = load_data()
+df_reg, df_irreg, df_part = load_data()
 model, METRICS, FEATURE_NAMES = train_model_cached(df_reg, df_irreg)
 
 # ── Chart style ────────────────────────────────────────────────────────────────
 BG   = '#060A10'
-C1, C2, C3, C4 = '#5B9EC9', '#C97080', '#C9A84C', '#7DCBA8'
+C1, C2, C3, C4, C5 = '#5B9EC9', '#C97080', '#C9A84C', '#7DCBA8', '#A090D8'
 CT   = '#2E4060'
 
 def sax(ax, fig):
@@ -363,6 +353,19 @@ PATTERN_EXAMPLES = {
     "oʊ → uː":        "know/knew · grow/grew · throw/threw",
 }
 
+SC_BADGE = {
+    'Emotional state': 'b-emo',
+    'Physical state':  'b-phy',
+    'Process result':  'b-pro',
+    'Ambiguous':       'b-amb',
+}
+SC_COLOR = {
+    'Emotional state': C2,
+    'Physical state':  C1,
+    'Process result':  C4,
+    'Ambiguous':       C3,
+}
+
 # ── Sidebar ────────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("""
@@ -379,11 +382,13 @@ with st.sidebar:
     page = st.radio("", [
         "/ Lookup",
         "/ Phonetic Explorer",
+        "/ Participial Adjectives",
         "/ Charts",
         "/ Model Performance",
         "/ Reference"
     ], label_visibility="collapsed")
 
+    total_verbs = len(df_reg) + len(df_irreg)
     st.markdown(f"""
     <div style="margin-top:2.5rem;font-family:'DM Mono',monospace;
                 font-size:0.65rem;line-height:2.3;">
@@ -391,7 +396,8 @@ with st.sidebar:
                   font-size:0.58rem;margin-bottom:0.4rem;">Dataset</div>
       <span style="color:{C4};">{len(df_reg)}</span>&nbsp;&nbsp;regular<br>
       <span style="color:{C2};">{len(df_irreg)}</span>&nbsp;&nbsp;irregular<br>
-      <span style="color:{C1};">{len(df_reg)+len(df_irreg)}</span>&nbsp;&nbsp;total<br>
+      <span style="color:{C5};">{len(df_part)}</span>&nbsp;&nbsp;participial adj<br>
+      <span style="color:{C1};">{total_verbs}</span>&nbsp;&nbsp;total verbs<br>
       <span style="color:#7DCBA8;">{METRICS['accuracy']:.1%}</span>&nbsp;&nbsp;model accuracy
     </div>
     <div style="margin-top:2.5rem;font-family:'DM Mono',monospace;
@@ -402,32 +408,113 @@ with st.sidebar:
     """, unsafe_allow_html=True)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# PAGE 1 — LOOKUP (with lemmatizer)
-# ─────────────────────────────────────────────────────────────────────────────
+# ═════════════════════════════════════════════════════════════════════════════
+# PAGE 1 — LOOKUP
+# ═════════════════════════════════════════════════════════════════════════════
 if page == "/ Lookup":
     st.markdown('<div class="page-title">Verb Lookup</div>', unsafe_allow_html=True)
-    st.markdown('<div class="page-sub">Any form — base · past · participle · audio · IPA · rule</div>', unsafe_allow_html=True)
+    st.markdown('<div class="page-sub">Any form — base · past · participle · participial adj · audio · IPA · rule</div>', unsafe_allow_html=True)
 
-    verb_input = st.text_input("", placeholder="fought   went   bought   walk   has been...").lower().strip()
+    verb_input = st.text_input("", placeholder="fought   went   broken   excited   walk   organized...").lower().strip()
 
     if not verb_input:
         st.markdown("""
         <div style="margin-top:3rem;font-family:'DM Mono',monospace;font-size:0.72rem;
                     color:#1A2E46;line-height:2.6;letter-spacing:0.04em;">
-          Try any form — base, past, or participle:<br>
+          Try any form — base, past, participle, or participial adjective:<br>
           fought &nbsp;&middot;&nbsp; went &nbsp;&middot;&nbsp; bought &nbsp;&middot;&nbsp;
-          broken &nbsp;&middot;&nbsp; walked &nbsp;&middot;&nbsp; started &nbsp;&middot;&nbsp;
-          written &nbsp;&middot;&nbsp; google
+          broken &nbsp;&middot;&nbsp; excited &nbsp;&middot;&nbsp; exhausted &nbsp;&middot;&nbsp;
+          walked &nbsp;&middot;&nbsp; organized &nbsp;&middot;&nbsp; google
         </div>
         """, unsafe_allow_html=True)
-
     else:
-        # ── Lemmatizer: search all 3 columns ─────────────────────────────────
-        row, verb_type, matched_form = find_verb(verb_input, df_reg, df_irreg)
+        row, verb_type, matched_form = find_verb(verb_input, df_reg, df_irreg, df_part)
 
-        if row is not None:
-            # ── Found in dataset ─────────────────────────────────────────────
+        if row is not None and verb_type == 'Participial Adjective':
+            # ── Participial Adjective result ──────────────────────────────
+            sc   = row['Semantic_Class']
+            bc   = SC_BADGE.get(sc, 'b-part')
+            info = get_semantic_class_info(sc)
+            tests = adjective_test(row['Participial_Form'])
+
+            st.markdown(f"""
+            <div class="found-in">
+              Found as <span style="color:#A090D8;">{matched_form}</span>
+              &nbsp;·&nbsp;
+              <span class="badge b-part">Participial Adjective</span>
+              <span class="badge {bc}">{sc}</span>
+            </div>
+            """, unsafe_allow_html=True)
+
+            c1, c2 = st.columns(2)
+            c1.metric("Base Verb",        row['Base_Verb'])
+            c2.metric("Participial Form", row['Participial_Form'])
+
+            st.markdown('<span class="sec-label">Audio</span>', unsafe_allow_html=True)
+            ca, cb = st.columns(2)
+            with ca: speak_button(str(row['Base_Verb']),        "Base verb",        f"bv_{verb_input}")
+            with cb: speak_button(str(row['Participial_Form']), "Participial form",  f"pf_{verb_input}")
+
+            st.markdown('<span class="sec-label">IPA Transcription</span>', unsafe_allow_html=True)
+            st.markdown(f"""
+            <div style="display:flex;gap:0.8rem;flex-wrap:wrap;margin-bottom:0.5rem;">
+              <div class="card-sm" style="flex:1;min-width:140px;">
+                <div style="font-family:'DM Mono',monospace;font-size:0.58rem;letter-spacing:0.14em;
+                            text-transform:uppercase;color:#1E3050;margin-bottom:0.35rem;">Base Verb</div>
+                <span class="ipa">{row['IPA_Base']}</span>
+              </div>
+              <div class="card-sm" style="flex:1;min-width:140px;">
+                <div style="font-family:'DM Mono',monospace;font-size:0.58rem;letter-spacing:0.14em;
+                            text-transform:uppercase;color:#1E3050;margin-bottom:0.35rem;">Participial Adjective</div>
+                <span class="ipa">{row['IPA_Adj']}</span>
+                <div style="font-family:'DM Mono',monospace;font-size:0.68rem;
+                            color:#2E4060;margin-top:0.35rem;">{row['Phonetic_Adj']}</div>
+              </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            st.markdown('<span class="sec-label">Usage & Classification</span>', unsafe_allow_html=True)
+            st.markdown(f"""
+            <div class="card">
+              <span class="badge {bc}">{sc}</span>
+              <div style="font-family:'DM Mono',monospace;font-size:0.78rem;
+                          color:#4A6280;margin-top:0.75rem;line-height:1.9;">
+                {info.get('description', '')}
+              </div>
+              <div style="font-family:'DM Mono',monospace;font-size:0.7rem;
+                          color:#5B9EC9;margin-top:0.8rem;">
+                Example: <span style="color:#DCE0EA;">{row['Example_Phrase']}</span>
+              </div>
+              <div style="font-family:'DM Mono',monospace;font-size:0.65rem;
+                          color:#1E3050;margin-top:0.7rem;line-height:1.9;border-top:1px solid #131D2E;padding-top:0.7rem;">
+                {row['Notes']}
+              </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            st.markdown('<span class="sec-label">Adjective Tests</span>', unsafe_allow_html=True)
+            st.markdown(f"""
+            <div class="card">
+              <div style="font-family:'DM Mono',monospace;font-size:0.65rem;
+                          color:#1E3050;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:0.8rem;">
+                Is it an adjective? Apply these tests:
+              </div>
+              <div style="font-family:'DM Mono',monospace;font-size:0.76rem;color:#4A6280;line-height:2.2;">
+                <span style="color:#2E4060;">Very test:&nbsp;</span>
+                <span style="color:#DCE0EA;">"very {row['Participial_Form']}"</span>
+                &nbsp;→ if natural, it's an adjective<br>
+                <span style="color:#2E4060;">Seem test:&nbsp;</span>
+                <span style="color:#DCE0EA;">"seem {row['Participial_Form']}"</span>
+                &nbsp;→ predicative adjective test<br>
+                <span style="color:#2E4060;">Attributive:&nbsp;</span>
+                <span style="color:#DCE0EA;">a {row['Participial_Form']} [noun]</span>
+                &nbsp;→ adjective before noun<br>
+              </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        elif row is not None:
+            # ── Regular or Irregular result ───────────────────────────────
             badge_cls = 'b-reg' if verb_type == 'Regular' else 'b-irr'
             st.markdown(f"""
             <div class="found-in">
@@ -440,20 +527,17 @@ if page == "/ Lookup":
             </div>
             """, unsafe_allow_html=True)
 
-            # Three forms
             c1, c2, c3 = st.columns(3)
             c1.metric("Base Form",       row['Base'])
             c2.metric("Simple Past",     row['Simple_Past'])
             c3.metric("Past Participle", row['Past_Participle'])
 
-            # Audio
             st.markdown('<span class="sec-label">Audio</span>', unsafe_allow_html=True)
             ca, cb, cc = st.columns(3)
             with ca: speak_button(str(row['Base']),            "Base form",       f"b_{verb_input}")
             with cb: speak_button(str(row['Simple_Past']),     "Simple past",     f"p_{verb_input}")
             with cc: speak_button(str(row['Past_Participle']), "Past participle", f"pp_{verb_input}")
 
-            # IPA
             st.markdown('<span class="sec-label">IPA Transcription</span>', unsafe_allow_html=True)
             st.markdown(f"""
             <div style="display:flex;gap:0.8rem;flex-wrap:wrap;margin-bottom:0.5rem;">
@@ -481,7 +565,6 @@ if page == "/ Lookup":
             </div>
             """, unsafe_allow_html=True)
 
-            # Rule
             st.markdown('<span class="sec-label">Phonetic Rule</span>', unsafe_allow_html=True)
             if verb_type == 'Regular':
                 ending = row['Ending']
@@ -528,8 +611,30 @@ if page == "/ Lookup":
                 </div>
                 """, unsafe_allow_html=True)
 
+            # Check if this verb also has a participial adjective entry
+            part_match = df_part[df_part['Base_Verb'].str.lower() == row['Base'].lower()]
+            if not part_match.empty:
+                pm = part_match.iloc[0]
+                bc2 = SC_BADGE.get(pm['Semantic_Class'], 'b-part')
+                st.markdown(f"""
+                <div class="card" style="border-color:#1A2E46;">
+                  <div style="font-family:'DM Mono',monospace;font-size:0.62rem;
+                              letter-spacing:0.14em;text-transform:uppercase;
+                              color:#1E3050;margin-bottom:0.5rem;">Also a Participial Adjective</div>
+                  <span class="badge b-part">adj</span>
+                  <span class="badge {bc2}">{pm['Semantic_Class']}</span>
+                  <span style="font-family:'DM Mono',monospace;font-size:0.72rem;color:#5B9EC9;">
+                    &nbsp;{pm['Participial_Form']}
+                  </span>
+                  <div style="font-family:'DM Mono',monospace;font-size:0.7rem;
+                              color:#1E3050;margin-top:0.5rem;">
+                    Example: <span style="color:#2E4060;">{pm['Example_Phrase']}</span>
+                  </div>
+                </div>
+                """, unsafe_allow_html=True)
+
         else:
-            # ── Not in dataset — ML prediction ───────────────────────────────
+            # ── Not in dataset — ML prediction ────────────────────────────
             st.markdown('<span class="sec-label">Not in dataset — ML Prediction</span>',
                         unsafe_allow_html=True)
 
@@ -596,9 +701,9 @@ if page == "/ Lookup":
                 """, unsafe_allow_html=True)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# ═════════════════════════════════════════════════════════════════════════════
 # PAGE 2 — PHONETIC EXPLORER
-# ─────────────────────────────────────────────────────────────────────────────
+# ═════════════════════════════════════════════════════════════════════════════
 elif page == "/ Phonetic Explorer":
     st.markdown('<div class="page-title">Phonetic Explorer</div>', unsafe_allow_html=True)
     st.markdown('<div class="page-sub">Regular -ed rules · irregular vowel patterns</div>', unsafe_allow_html=True)
@@ -635,7 +740,7 @@ elif page == "/ Phonetic Explorer":
         """, unsafe_allow_html=True)
 
         st.markdown('<span class="sec-label">Filter</span>', unsafe_allow_html=True)
-        ef = st.selectbox("", ["/t/ — voiceless","/d/ — voiced","/ɪd/ — extra syllable"],
+        ef = st.selectbox("", ["/t/ — voiceless", "/d/ — voiced", "/ɪd/ — extra syllable"],
                           label_visibility="collapsed", key="ef")
         ec = ef.split(" ")[0]
         filtered = df_reg[df_reg['Ending'] == ec][
@@ -688,30 +793,148 @@ elif page == "/ Phonetic Explorer":
         )
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# PAGE 3 — CHARTS
-# ─────────────────────────────────────────────────────────────────────────────
+# ═════════════════════════════════════════════════════════════════════════════
+# PAGE 3 — PARTICIPIAL ADJECTIVES  (NEW)
+# ═════════════════════════════════════════════════════════════════════════════
+elif page == "/ Participial Adjectives":
+    st.markdown('<div class="page-title">Participial Adjectives</div>', unsafe_allow_html=True)
+    st.markdown('<div class="page-sub">Past participles used as adjectives · 4 semantic classes · 76 entries</div>', unsafe_allow_html=True)
+
+    sc_counts = df_part['Semantic_Class'].value_counts()
+
+    # Overview stats
+    st.markdown(f"""
+    <div class="stat-grid-4">
+      <div class="stat-block">
+        <div class="stat-num" style="color:{C2};">{sc_counts.get('Emotional state', 0)}</div>
+        <div style="margin:0.3rem 0;"><span class="badge b-emo">Emotional</span></div>
+        <div class="stat-lbl">Experiencer-oriented</div>
+        <div class="stat-sub">bored · excited · tired</div>
+      </div>
+      <div class="stat-block">
+        <div class="stat-num" style="color:{C1};">{sc_counts.get('Physical state', 0)}</div>
+        <div style="margin:0.3rem 0;"><span class="badge b-phy">Physical</span></div>
+        <div class="stat-lbl">Visible condition</div>
+        <div class="stat-sub">broken · frozen · torn</div>
+      </div>
+      <div class="stat-block">
+        <div class="stat-num" style="color:{C4};">{sc_counts.get('Process result', 0)}</div>
+        <div style="margin:0.3rem 0;"><span class="badge b-pro">Process</span></div>
+        <div class="stat-lbl">Completed action</div>
+        <div class="stat-sub">cooked · printed · trained</div>
+      </div>
+      <div class="stat-block">
+        <div class="stat-num" style="color:{C3};">{sc_counts.get('Ambiguous', 0)}</div>
+        <div style="margin:0.3rem 0;"><span class="badge b-amb">Ambiguous</span></div>
+        <div class="stat-lbl">Verb or adjective</div>
+        <div class="stat-sub">experienced · limited · mixed</div>
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Key linguistic note
+    st.markdown(f"""
+    <div class="card" style="margin-bottom:1.5rem;">
+      <div style="font-family:'DM Mono',monospace;font-size:0.62rem;letter-spacing:0.14em;
+                  text-transform:uppercase;color:#1E3050;margin-bottom:0.6rem;">What is a Participial Adjective?</div>
+      <div style="font-family:'DM Mono',monospace;font-size:0.76rem;color:#4A6280;line-height:2;">
+        A past participle used as an <b style="color:#A090D8;">adjective</b> rather than a verb form.
+        The same word can be both:
+        <span style="color:#C97080;">"She <u>exhausted</u> her savings"</span> (verb, past tense)
+        vs
+        <span style="color:#7DCBA8;">"an <u>exhausted</u> runner"</span> (adjective, attributive).
+        <br>
+        Key test: if <b>very</b> can precede it naturally, it's functioning as an adjective.
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        "All", "Emotional", "Physical", "Process Result", "Ambiguous"
+    ])
+
+    def part_table(df_filtered):
+        st.markdown(f'<span class="sec-label">{len(df_filtered)} entries</span>',
+                    unsafe_allow_html=True)
+        st.dataframe(
+            df_filtered[['Base_Verb','Participial_Form','IPA_Adj','Phonetic_Adj',
+                         'Semantic_Class','Example_Phrase','Notes']
+                        ].reset_index(drop=True),
+            use_container_width=True, height=460
+        )
+
+    with tab1:
+        s = st.text_input("", placeholder="Search participial adjectives...", key="s_part")
+        df_show = df_part.copy()
+        if s:
+            mask = (df_show['Base_Verb'].str.contains(s.lower(), na=False) |
+                    df_show['Participial_Form'].str.contains(s.lower(), na=False))
+            df_show = df_show[mask]
+        part_table(df_show)
+
+    for tab_widget, sc_name in zip([tab2, tab3, tab4, tab5],
+                                   ['Emotional state','Physical state',
+                                    'Process result','Ambiguous']):
+        with tab_widget:
+            info = get_semantic_class_info(sc_name)
+            bc   = SC_BADGE.get(sc_name, 'b-part')
+            st.markdown(f"""
+            <div class="card" style="margin-bottom:1rem;">
+              <span class="badge {bc}">{sc_name}</span>
+              <div style="font-family:'DM Mono',monospace;font-size:0.75rem;
+                          color:#4A6280;margin-top:0.6rem;line-height:1.9;">
+                {info.get('description', '')}
+              </div>
+              <div style="font-family:'DM Mono',monospace;font-size:0.65rem;
+                          color:#1E3050;margin-top:0.5rem;">
+                Common examples: {info.get('examples', '')}
+              </div>
+            </div>
+            """, unsafe_allow_html=True)
+            part_table(df_part[df_part['Semantic_Class'] == sc_name])
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# PAGE 4 — CHARTS
+# ═════════════════════════════════════════════════════════════════════════════
 elif page == "/ Charts":
     st.markdown('<div class="page-title">Charts & Analysis</div>', unsafe_allow_html=True)
-    st.markdown('<div class="page-sub">Phonetic patterns in 298 English verbs</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="page-sub">Phonetic patterns across {len(df_reg)+len(df_irreg)} verbs + {len(df_part)} participial adjectives</div>', unsafe_allow_html=True)
 
-    t1, t2, t3, t4 = st.tabs(["Overview","-ed Endings","Irregular Patterns","Verb Length"])
+    t1, t2, t3, t4, t5 = st.tabs([
+        "Overview", "-ed Endings", "Irregular Patterns",
+        "Verb Length", "Participial Adjectives"
+    ])
 
     with t1:
-        fig, ax = plt.subplots(figsize=(6, 3.8))
-        sax(ax, fig)
-        bars = ax.bar(['Regular','Irregular'], [len(df_reg), len(df_irreg)],
-                      color=[C1, C2], width=0.38, edgecolor=BG, linewidth=2.5)
-        for bar, val in zip(bars, [len(df_reg), len(df_irreg)]):
-            ax.text(bar.get_x()+bar.get_width()/2, bar.get_height()+1.5,
-                    str(val), ha='center', fontweight='bold', fontsize=12, color='#8096B8')
-        ax.set_title('Dataset Composition', fontsize=10, pad=10)
-        ax.set_ylim(0, max(len(df_reg), len(df_irreg))*1.2)
-        for sp in ax.spines.values(): sp.set_visible(False)
-        ax.tick_params(bottom=False)
+        # ── 3-bar dataset overview + donut ────────────────────────────────
+        fig, axes = plt.subplots(1, 2, figsize=(11, 4))
+        for ax in axes: sax(ax, fig)
+
+        cats   = ['Regular', 'Irregular', 'Participial\nAdj']
+        vals   = [len(df_reg), len(df_irreg), len(df_part)]
+        colors = [C1, C2, C5]
+
+        axes[0].bar(cats, vals, color=colors, width=0.42,
+                    edgecolor=BG, linewidth=2.5)
+        for i, (cat, val) in enumerate(zip(cats, vals)):
+            axes[0].text(i, val + 1.5, str(val), ha='center',
+                         fontweight='bold', fontsize=12, color='#8096B8')
+        axes[0].set_title('Dataset Composition', fontsize=10, pad=10)
+        axes[0].set_ylim(0, max(vals) * 1.2)
+        for sp in axes[0].spines.values(): sp.set_visible(False)
+        axes[0].tick_params(bottom=False)
+
+        axes[1].pie(vals,
+                    labels=[f'{c.replace(chr(10), " ")}  ({v})' for c, v in zip(cats, vals)],
+                    colors=colors, autopct='%1.0f%%', startangle=90,
+                    wedgeprops={'edgecolor': BG, 'linewidth': 3},
+                    textprops={'color': CT, 'fontsize': 8.5, 'fontfamily': 'monospace'})
+        axes[1].set_title('Dataset Share', fontsize=10, pad=10)
+
         plt.tight_layout()
         st.pyplot(fig)
-        st.markdown('<div style="font-family:\'DM Mono\',monospace;font-size:0.72rem;color:#1E3050;margin-top:0.4rem;">The 10 most frequent English verbs (be, have, do, say, go, get, make, know, think, see) are all irregular.</div>', unsafe_allow_html=True)
+        st.markdown(f'<div style="font-family:\'DM Mono\',monospace;font-size:0.72rem;color:#1E3050;margin-top:0.4rem;">The 10 most frequent English verbs are all irregular. Of {len(df_part)} participial adjectives, {len(df_part[df_part["Semantic_Class"]=="Emotional state"])} describe emotional states — the largest class.</div>', unsafe_allow_html=True)
 
     with t2:
         ec = df_reg['Ending'].value_counts()
@@ -720,13 +943,13 @@ elif page == "/ Charts":
         axes[0].bar(ec.index, ec.values, color=[C4, C1, C3],
                     edgecolor=BG, linewidth=2.5, width=0.38)
         for i, (idx, val) in enumerate(ec.items()):
-            axes[0].text(i, val+1, str(val), ha='center',
+            axes[0].text(i, val + 1, str(val), ha='center',
                          fontweight='bold', fontsize=11, color='#8096B8')
         axes[0].set_title('-ed Ending Count', fontsize=10, pad=10)
         for sp in axes[0].spines.values(): sp.set_visible(False)
         axes[0].tick_params(bottom=False)
         axes[1].pie(ec.values,
-                    labels=[f'{i}  ({v})' for i,v in ec.items()],
+                    labels=[f'{i}  ({v})' for i, v in ec.items()],
                     colors=[C4, C1, C3], autopct='%1.0f%%', startangle=90,
                     wedgeprops={'edgecolor': BG, 'linewidth': 3},
                     textprops={'color': CT, 'fontsize': 8.5, 'fontfamily': 'monospace'})
@@ -735,17 +958,17 @@ elif page == "/ Charts":
         st.pyplot(fig)
 
     with t3:
-        vc = df_irreg['Vowel_Change'].value_counts().head(13)
-        fig, ax = plt.subplots(figsize=(10, 5.5))
+        vc = df_irreg['Vowel_Change'].value_counts().head(14)
+        fig, ax = plt.subplots(figsize=(10, 5.8))
         sax(ax, fig)
         cols = [C2 if i == 0 else C1 if i < 4 else C3 for i in range(len(vc))]
         ax.barh(vc.index[::-1], vc.values[::-1],
                 color=cols[::-1], edgecolor=BG, linewidth=2, height=0.58)
         for bar, val in zip(ax.patches, vc.values[::-1]):
-            ax.text(bar.get_width()+0.1, bar.get_y()+bar.get_height()/2,
+            ax.text(bar.get_width() + 0.1, bar.get_y() + bar.get_height() / 2,
                     str(val), va='center', fontsize=9, fontweight='bold', color='#8096B8')
         ax.set_title('Irregular Vowel Change Patterns', fontsize=10, pad=10)
-        ax.set_xlim(0, vc.max()+5)
+        ax.set_xlim(0, vc.max() + 5)
         for sp in ax.spines.values(): sp.set_visible(False)
         ax.tick_params(left=False)
         ax.set_yticklabels(vc.index[::-1],
@@ -758,9 +981,9 @@ elif page == "/ Charts":
         df_irreg['len'] = df_irreg['Base'].str.len()
         fig, ax = plt.subplots(figsize=(10, 4))
         sax(ax, fig)
-        ax.hist(df_reg['len'],   bins=range(2,15), alpha=0.75, color=C1,
+        ax.hist(df_reg['len'],   bins=range(2, 16), alpha=0.75, color=C1,
                 label='Regular',   edgecolor=BG, linewidth=1.5)
-        ax.hist(df_irreg['len'], bins=range(2,15), alpha=0.75, color=C2,
+        ax.hist(df_irreg['len'], bins=range(2, 16), alpha=0.75, color=C2,
                 label='Irregular', edgecolor=BG, linewidth=1.5)
         ax.axvline(df_reg['len'].mean(),   color=C1, linestyle='--', linewidth=1.5,
                    label=f"Reg avg {df_reg['len'].mean():.1f}")
@@ -774,15 +997,102 @@ elif page == "/ Charts":
         st.pyplot(fig)
         st.markdown('<div style="font-family:\'DM Mono\',monospace;font-size:0.72rem;color:#1E3050;margin-top:0.4rem;">Irregular verbs are shorter on average — they derive from Old English. Modern coined verbs (google, zoom, tweet) are almost always regular.</div>', unsafe_allow_html=True)
 
+    with t5:
+        # ── Participial adjectives charts ─────────────────────────────────
+        sc_counts = df_part['Semantic_Class'].value_counts()
+        sc_colors = [SC_COLOR.get(k, C5) for k in sc_counts.index]
 
-# ─────────────────────────────────────────────────────────────────────────────
-# PAGE 4 — MODEL PERFORMANCE DASHBOARD
-# ─────────────────────────────────────────────────────────────────────────────
+        fig, axes = plt.subplots(1, 2, figsize=(11, 4.5))
+        for ax in axes: sax(ax, fig)
+
+        # Bar chart
+        axes[0].bar(range(len(sc_counts)), sc_counts.values,
+                    color=sc_colors, edgecolor=BG, linewidth=2, width=0.45)
+        for i, val in enumerate(sc_counts.values):
+            axes[0].text(i, val + 0.3, str(val), ha='center',
+                         fontweight='bold', fontsize=11, color='#8096B8')
+        axes[0].set_xticks(range(len(sc_counts)))
+        axes[0].set_xticklabels(
+            [k.replace(' ', '\n') for k in sc_counts.index],
+            fontfamily='monospace', fontsize=7.5, color=CT
+        )
+        axes[0].set_title('Participial Adj by Semantic Class', fontsize=10, pad=10)
+        axes[0].set_ylim(0, sc_counts.max() * 1.25)
+        for sp in axes[0].spines.values(): sp.set_visible(False)
+        axes[0].tick_params(bottom=False)
+
+        # Donut chart
+        wedges, texts, autotexts = axes[1].pie(
+            sc_counts.values,
+            labels=[f'{k}  ({v})' for k, v in sc_counts.items()],
+            colors=sc_colors, autopct='%1.0f%%', startangle=90,
+            wedgeprops={'edgecolor': BG, 'linewidth': 3},
+            textprops={'color': CT, 'fontsize': 8, 'fontfamily': 'monospace'},
+            pctdistance=0.78
+        )
+        # Draw inner circle for donut effect
+        centre_circle = plt.Circle((0, 0), 0.55, fc='#0B1120')
+        axes[1].add_patch(centre_circle)
+        axes[1].text(0, 0, f'{len(df_part)}\nadj', ha='center', va='center',
+                     fontsize=11, fontweight='bold',
+                     color='#DCE0EA', fontfamily='monospace')
+        axes[1].set_title('Participial Adj Distribution', fontsize=10, pad=10)
+
+        plt.tight_layout()
+        st.pyplot(fig)
+
+        # Second chart: overlap between verbs and participial adjectives
+        st.markdown('<span class="sec-label">Verb–Adjective Overlap</span>',
+                    unsafe_allow_html=True)
+
+        part_bases = set(df_part['Base_Verb'].str.lower())
+        reg_bases  = set(df_reg['Base'].str.lower())
+        irr_bases  = set(df_irreg['Base'].str.lower())
+
+        overlap_reg  = part_bases & reg_bases
+        overlap_irr  = part_bases & irr_bases
+        only_part    = part_bases - reg_bases - irr_bases
+
+        fig2, ax2 = plt.subplots(figsize=(8, 3.5))
+        sax(ax2, fig2)
+        bars = ax2.barh(
+            ['From Regular verbs', 'From Irregular verbs', 'Unique to Part. Adj'],
+            [len(overlap_reg), len(overlap_irr), len(only_part)],
+            color=[C1, C2, C5], edgecolor=BG, linewidth=2, height=0.45
+        )
+        for bar, val in zip(bars, [len(overlap_reg), len(overlap_irr), len(only_part)]):
+            ax2.text(bar.get_width() + 0.2, bar.get_y() + bar.get_height() / 2,
+                     str(val), va='center', fontsize=10,
+                     fontweight='bold', color='#8096B8')
+        ax2.set_title('Participial Adj: Verb Source Overlap', fontsize=10, pad=10)
+        ax2.set_xlim(0, max(len(overlap_reg), len(overlap_irr), len(only_part)) + 6)
+        for sp in ax2.spines.values(): sp.set_visible(False)
+        ax2.tick_params(left=False)
+        ax2.set_yticklabels(
+            ['From Regular verbs', 'From Irregular verbs', 'Unique to Part. Adj'],
+            fontfamily='monospace', fontsize=8.5, color=CT
+        )
+        plt.tight_layout()
+        st.pyplot(fig2)
+
+        st.markdown(f"""
+        <div style="font-family:'DM Mono',monospace;font-size:0.72rem;color:#1E3050;margin-top:0.4rem;line-height:2;">
+          <span style="color:{C1};">{len(overlap_reg)}</span> participial adjectives derive from regular verbs
+          &nbsp;·&nbsp;
+          <span style="color:{C2};">{len(overlap_irr)}</span> from irregular verbs (broken, frozen, worn...)
+          &nbsp;·&nbsp;
+          <span style="color:{C5};">{len(only_part)}</span> appear only in the participial sheet
+        </div>
+        """, unsafe_allow_html=True)
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# PAGE 5 — MODEL PERFORMANCE
+# ═════════════════════════════════════════════════════════════════════════════
 elif page == "/ Model Performance":
     st.markdown('<div class="page-title">Model Performance</div>', unsafe_allow_html=True)
     st.markdown('<div class="page-sub">RandomForest · 200 estimators · 5-fold cross-validation</div>', unsafe_allow_html=True)
 
-    # ── Main metrics ──────────────────────────────────────────────────────────
     st.markdown('<span class="sec-label">Evaluation Metrics — Test Set</span>', unsafe_allow_html=True)
     st.markdown(f"""
     <div class="metric-row">
@@ -805,11 +1115,9 @@ elif page == "/ Model Performance":
     </div>
     """, unsafe_allow_html=True)
 
-    # ── Cross-validation ──────────────────────────────────────────────────────
     st.markdown('<span class="sec-label">5-Fold Cross-Validation</span>', unsafe_allow_html=True)
     cv_cols = st.columns(5)
     for i, (col, score) in enumerate(zip(cv_cols, METRICS['cv_scores'])):
-        pct = int(score * 100)
         col.markdown(f"""
         <div class="card-sm" style="text-align:center;">
           <div style="font-family:'DM Mono',monospace;font-size:0.6rem;
@@ -822,17 +1130,14 @@ elif page == "/ Model Performance":
     cv_mean = METRICS['cv_mean']
     cv_std  = METRICS['cv_std']
     st.markdown(f"""
-    <div style="font-family:'DM Mono',monospace;font-size:0.72rem;color:#2E4060;
-                margin-top:0.8rem;">
+    <div style="font-family:'DM Mono',monospace;font-size:0.72rem;color:#2E4060;margin-top:0.8rem;">
       Mean: <span style="color:{C4};font-weight:600;">{cv_mean:.1%}</span>
       &nbsp;&nbsp;±&nbsp;&nbsp;
       <span style="color:#1E3050;">{cv_std:.2%}</span> std
-      &nbsp;&nbsp;&middot;&nbsp;&nbsp;
-      Stable model: low variance across folds.
+      &nbsp;&nbsp;·&nbsp;&nbsp; Stable model: low variance across folds.
     </div>
     """, unsafe_allow_html=True)
 
-    # ── Confusion matrix ──────────────────────────────────────────────────────
     st.markdown('<span class="sec-label">Confusion Matrix</span>', unsafe_allow_html=True)
     cm = METRICS['cm']
     col_cm, col_info = st.columns([1, 1])
@@ -842,8 +1147,8 @@ elif page == "/ Model Performance":
         sax(ax, fig)
         sns.heatmap(cm, annot=True, fmt='d', ax=ax,
                     cmap='Blues', linewidths=2, linecolor=BG,
-                    xticklabels=['Regular','Irregular'],
-                    yticklabels=['Regular','Irregular'],
+                    xticklabels=['Regular', 'Irregular'],
+                    yticklabels=['Regular', 'Irregular'],
                     cbar=False,
                     annot_kws={'fontsize': 14, 'fontweight': 'bold',
                                'color': '#DCE0EA', 'fontfamily': 'monospace'})
@@ -856,29 +1161,24 @@ elif page == "/ Model Performance":
 
     with col_info:
         tn, fp, fn, tp = cm[0][0], cm[0][1], cm[1][0], cm[1][1]
-        total = tn + fp + fn + tp
         st.markdown(f"""
         <div style="font-family:'DM Mono',monospace;font-size:0.72rem;line-height:2.2;margin-top:0.5rem;">
           <div style="color:#1E3050;text-transform:uppercase;letter-spacing:0.1em;
                       font-size:0.6rem;margin-bottom:0.5rem;">Reading the matrix</div>
           <span style="color:{C4};">&#10003;</span>&nbsp;
           <span style="color:#2E4060;">True Regular:&nbsp;</span>
-          <span style="color:#DCE0EA;">{tn}</span>
-          <br>
+          <span style="color:#DCE0EA;">{tn}</span><br>
           <span style="color:{C4};">&#10003;</span>&nbsp;
           <span style="color:#2E4060;">True Irregular:&nbsp;</span>
-          <span style="color:#DCE0EA;">{tp}</span>
-          <br>
+          <span style="color:#DCE0EA;">{tp}</span><br>
           <span style="color:{C2};">&#10007;</span>&nbsp;
           <span style="color:#2E4060;">False Positives:&nbsp;</span>
           <span style="color:#DCE0EA;">{fp}</span>
-          <span style="font-size:0.62rem;color:#1A2E46;"> (said Irreg, was Reg)</span>
-          <br>
+          <span style="font-size:0.62rem;color:#1A2E46;"> (said Irreg, was Reg)</span><br>
           <span style="color:{C2};">&#10007;</span>&nbsp;
           <span style="color:#2E4060;">False Negatives:&nbsp;</span>
           <span style="color:#DCE0EA;">{fn}</span>
-          <span style="font-size:0.62rem;color:#1A2E46;"> (said Reg, was Irreg)</span>
-          <br><br>
+          <span style="font-size:0.62rem;color:#1A2E46;"> (said Reg, was Irreg)</span><br><br>
           <div style="color:#1E3050;text-transform:uppercase;letter-spacing:0.1em;
                       font-size:0.6rem;margin-bottom:0.5rem;">Test set split</div>
           <span style="color:#2E4060;">Train:&nbsp;</span>
@@ -889,10 +1189,9 @@ elif page == "/ Model Performance":
         </div>
         """, unsafe_allow_html=True)
 
-    # ── Feature importance ────────────────────────────────────────────────────
     st.markdown('<span class="sec-label">Feature Importance — Top 12</span>', unsafe_allow_html=True)
     imp_sorted = sorted(METRICS['importances'].items(), key=lambda x: x[1], reverse=True)[:12]
-    imp_df = pd.DataFrame(imp_sorted, columns=['Feature','Importance'])
+    imp_df = pd.DataFrame(imp_sorted, columns=['Feature', 'Importance'])
 
     fig, ax = plt.subplots(figsize=(10, 4))
     sax(ax, fig)
@@ -900,11 +1199,11 @@ elif page == "/ Model Performance":
     ax.barh(imp_df['Feature'][::-1], imp_df['Importance'][::-1],
             color=palette[::-1], edgecolor=BG, linewidth=1.5, height=0.55)
     for bar, val in zip(ax.patches, imp_df['Importance'][::-1]):
-        ax.text(bar.get_width()+0.001, bar.get_y()+bar.get_height()/2,
+        ax.text(bar.get_width() + 0.001, bar.get_y() + bar.get_height() / 2,
                 f'{val:.3f}', va='center', fontsize=8, color='#4A6280',
                 fontfamily='monospace')
     ax.set_title('Feature Importance', fontsize=10, pad=10)
-    ax.set_xlim(0, imp_df['Importance'].max()*1.25)
+    ax.set_xlim(0, imp_df['Importance'].max() * 1.25)
     for sp in ax.spines.values(): sp.set_visible(False)
     ax.tick_params(left=False)
     ax.set_yticklabels(imp_df['Feature'][::-1],
@@ -912,7 +1211,6 @@ elif page == "/ Model Performance":
     plt.tight_layout()
     st.pyplot(fig)
 
-    # ── Model architecture ────────────────────────────────────────────────────
     st.markdown('<span class="sec-label">Model Architecture</span>', unsafe_allow_html=True)
     st.markdown(f"""
     <div class="card" style="font-family:'DM Mono',monospace;font-size:0.72rem;
@@ -921,21 +1219,21 @@ elif page == "/ Model Performance":
       <span style="color:{C1};">Estimators:</span> 200 decision trees<br>
       <span style="color:{C1};">Max depth:</span> 8 levels<br>
       <span style="color:{C1};">Features:</span> {len(FEATURE_NAMES)} — length, vowel count, syllables,
-      phonetic category (voiced/voiceless/stop), suffix patterns (n-grams), bigrams, trigrams<br>
+      phonetic category (voiced/voiceless/stop), suffix patterns, n-grams, participial heuristic<br>
       <span style="color:{C1};">Class weight:</span> balanced (handles regular/irregular imbalance)<br>
       <span style="color:{C1};">Validation:</span> 5-fold cross-validation
     </div>
     """, unsafe_allow_html=True)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# PAGE 5 — REFERENCE
-# ─────────────────────────────────────────────────────────────────────────────
+# ═════════════════════════════════════════════════════════════════════════════
+# PAGE 6 — REFERENCE
+# ═════════════════════════════════════════════════════════════════════════════
 elif page == "/ Reference":
     st.markdown('<div class="page-title">Verb Reference</div>', unsafe_allow_html=True)
-    st.markdown('<div class="page-sub">Complete searchable table — 298 verbs</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="page-sub">Complete searchable table — {len(df_reg)+len(df_irreg)} verbs · {len(df_part)} participial adjectives</div>', unsafe_allow_html=True)
 
-    t_r, t_i = st.tabs(["Regular Verbs","Irregular Verbs"])
+    t_r, t_i, t_p = st.tabs(["Regular Verbs", "Irregular Verbs", "Participial Adjectives"])
 
     with t_r:
         s = st.text_input("", placeholder="Search regular verbs...", key="s_r")
@@ -950,7 +1248,7 @@ elif page == "/ Reference":
         )
 
     with t_i:
-        cs, cf = st.columns([2,1])
+        cs, cf = st.columns([2, 1])
         with cs:
             s2 = st.text_input("", placeholder="Search irregular verbs...", key="s_i")
         with cf:
@@ -967,5 +1265,28 @@ elif page == "/ Reference":
         st.dataframe(
             df_sh2[['Base','Simple_Past','Past_Participle',
                     'IPA_Base','IPA_Past','Vowel_Change']].reset_index(drop=True),
+            use_container_width=True, height=520
+        )
+
+    with t_p:
+        cs3, cf3 = st.columns([2, 1])
+        with cs3:
+            s3 = st.text_input("", placeholder="Search participial adjectives...", key="s_p")
+        with cf3:
+            sc_opts = ["All classes"] + df_part['Semantic_Class'].value_counts().index.tolist()
+            sc_f = st.selectbox("", sc_opts, key="ref_sc", label_visibility="collapsed")
+
+        df_sh3 = df_part.copy()
+        if s3:
+            mask = (df_sh3['Base_Verb'].str.contains(s3.lower(), na=False) |
+                    df_sh3['Participial_Form'].str.contains(s3.lower(), na=False))
+            df_sh3 = df_sh3[mask]
+        if sc_f != "All classes":
+            df_sh3 = df_sh3[df_sh3['Semantic_Class'] == sc_f]
+
+        st.markdown(f'<span class="sec-label">{len(df_sh3)} entries</span>', unsafe_allow_html=True)
+        st.dataframe(
+            df_sh3[['Base_Verb','Participial_Form','IPA_Adj','Phonetic_Adj',
+                    'Semantic_Class','Example_Phrase','Notes']].reset_index(drop=True),
             use_container_width=True, height=520
         )
