@@ -278,58 +278,53 @@ def load_data():
     df_irreg['Type'] = 'Irregular'
     return df_reg, df_irreg, df_part
 
-
 @st.cache_resource
 def train_model_cached(df_reg, df_irreg):
+
     df_all = pd.concat([df_reg, df_irreg], ignore_index=True)
     X = extract_features(df_all)
     y = (df_all['Type'] == 'Irregular').astype(int)
 
     X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.20, random_state=42, stratify=y)
+        X, y, test_size=0.20, random_state=42, stratify=y
+    )
 
     model = RandomForestClassifier(
-        n_estimators=200, max_depth=8,
-        min_samples_leaf=2, random_state=42,
+        n_estimators=200,
+        max_depth=8,
+        min_samples_leaf=2,
+        random_state=42,
         class_weight='balanced'
     )
+
     model.fit(X_train, y_train)
 
     y_pred = model.predict(X_test)
-    cv     = cross_val_score(model, X, y, cv=5, scoring='accuracy')
+    cv = cross_val_score(model, X, y, cv=5, scoring='accuracy')
 
     metrics = {
-        'accuracy':  round(accuracy_score(y_test, y_pred), 4),
+        'accuracy': round(accuracy_score(y_test, y_pred), 4),
         'precision': round(precision_score(y_test, y_pred, average='weighted'), 4),
-        'recall':    round(recall_score(y_test, y_pred, average='weighted'), 4),
-        'f1':        round(f1_score(y_test, y_pred, average='weighted'), 4),
-        'cv_mean':   round(cv.mean(), 4),
-        'cv_std':    round(cv.std(), 4),
+        'recall': round(recall_score(y_test, y_pred, average='weighted'), 4),
+        'f1': round(f1_score(y_test, y_pred, average='weighted'), 4),
+        'cv_mean': round(cv.mean(), 4),
+        'cv_std': round(cv.std(), 4),
         'cv_scores': [round(float(s), 4) for s in cv],
-        'cm':        confusion_matrix(y_test, y_pred).tolist(),
-        'report':    classification_report(y_test, y_pred,
-                         target_names=['Regular','Irregular'],
-                         output_dict=True),
-        'importances': dict(zip(
-            X.columns.tolist(),
-            [round(float(v), 6) for v in model.feature_importances_]
-        )),
+        'cm': confusion_matrix(y_test, y_pred).tolist(),
         'train_size': len(X_train),
-        'test_size':  len(X_test),
+        'test_size': len(X_test),
     }
-    
+
+    # --- Misclassification analysis ---
     df_test = df_all.iloc[X_test.index].copy()
-df_test['predicted'] = ['Irregular' if p == 1 else 'Regular' for p in y_pred]
-df_test['actual']    = ['Irregular' if a == 1 else 'Regular' for a in y_test]
-df_test['correct']   = y_pred == y_test.values
-df_test['prob_irreg'] = [round(p[1]*100, 1) for p in model.predict_proba(X_test)]
+    df_test['predicted'] = ['Irregular' if p == 1 else 'Regular' for p in y_pred]
+    df_test['actual'] = ['Irregular' if a == 1 else 'Regular' for a in y_test]
+    df_test['correct'] = y_pred == y_test.values
+    df_test['prob_irreg'] = [round(p[1]*100, 1) for p in model.predict_proba(X_test)]
 
-misclassified_df = df_test[~df_test['correct']].reset_index(drop=True)
+    misclassified_df = df_test[~df_test['correct']].reset_index(drop=True)
 
-return model, metrics, X.columns.tolist(), misclassified_df
-
-df_reg, df_irreg, df_part = load_data()
-model, METRICS, FEATURE_NAMES, MISCLASSIFIED = train_model_cached(df_reg, df_irreg)
+    return model, metrics, X.columns.tolist(), misclassified_df
 
 # ── Chart style ────────────────────────────────────────────────────────────────
 BG   = '#060A10'
