@@ -3,16 +3,25 @@ preprocessing.py
 Feature engineering pipeline for the verb classifier.
 Includes phonetic category, syllable count, n-grams,
 voiced/voiceless encoding — real NLP feature engineering.
+
+Updated: added participial adjective feature extraction
+for future 3-class classification (Regular / Irregular / Participial).
 """
 
 import pandas as pd
 from sklearn.preprocessing import LabelEncoder
 
 
-# Phonetic constants
-VOICELESS = {'p', 'k', 'f', 's', 'x', 'c'}
+# ── Phonetic constants ─────────────────────────────────────────────────────────
+VOICELESS       = {'p', 'k', 'f', 's', 'x', 'c'}
 VOICELESS_DIGRAPHS = {'sh', 'ch', 'tch', 'ck', 'gh'}
-STOP_ENDINGS = {'t', 'd'}
+STOP_ENDINGS    = {'t', 'd'}
+
+# Suffixes strongly associated with participial adjectives
+PART_ADJ_SUFFIXES = [
+    'ed', 'en', 'ied', 'ned', 'red', 'led', 'sed', 'ted', 'ked',
+    'ven', 'zen', 'ken', 'ten', 'orn', 'ung', 'unk', 'elt', 'ept',
+]
 
 
 def count_syllables(word: str) -> int:
@@ -52,7 +61,6 @@ def get_phonetic_category(word: str) -> str:
     """
     w = word.lower()
 
-    # Check digraphs first (order matters)
     if len(w) >= 3 and w[-3:] == 'tch':
         return 'voiceless'
     if len(w) >= 2:
@@ -76,28 +84,44 @@ def get_ngram(word: str, n: int) -> str:
     return w[-n:] if len(w) >= n else w.zfill(n)
 
 
+def is_likely_participial(word: str) -> int:
+    """
+    Heuristic check: does the word look like a participial adjective form?
+    Returns 1 if yes, 0 if no.
+    Used as an additional feature for 3-class classification.
+    """
+    w = word.lower()
+    for suffix in PART_ADJ_SUFFIXES:
+        if w.endswith(suffix) and len(w) > len(suffix) + 1:
+            return 1
+    return 0
+
+
 def extract_features(df: pd.DataFrame) -> pd.DataFrame:
     """
     Full feature extraction pipeline.
 
     Features created:
-    ─ Basic:          length, vowel_count, consonant_count
-    ─ Phonetic:       syllable_count, phonetic_category (encoded),
-                      is_voiceless, is_voiced, is_stop, is_vowel_end
-    ─ Suffix binary:  ends_* for 20 common endings
-    ─ N-grams:        bigram, trigram (last 2-3 chars, label-encoded)
-    ─ Characters:     last_letter, second_last (label-encoded)
+    ─ Basic:           length, vowel_count, consonant_count
+    ─ Phonetic:        syllable_count, phonetic_category (encoded),
+                       is_voiceless, is_voiced, is_stop, is_vowel_end
+    ─ Suffix binary:   ends_* for 20 common endings
+    ─ Participial:     is_likely_participial (heuristic suffix check)
+    ─ N-grams:         bigram, trigram (last 2-3 chars, label-encoded)
+    ─ Characters:      last_letter, second_last (label-encoded)
     """
     f = pd.DataFrame(index=df.index)
 
-    base = df['Base'].astype(str).str.lower()
+    # Use 'Base' column if present; fall back to 'Base_Verb' for participial sheet
+    base_col = 'Base' if 'Base' in df.columns else 'Base_Verb'
+    base = df[base_col].astype(str).str.lower()
 
-    # ── Basic ────────────────────────────────────────────────
+    # ── Basic ─────────────────────────────────────────────────
     f['length']          = base.str.len()
     f['vowel_count']     = base.str.count('[aeiou]')
     f['consonant_count'] = base.str.count('[bcdfghjklmnpqrstvwxyz]')
 
-    # ── Phonetic ─────────────────────────────────────────────
+    # ── Phonetic ──────────────────────────────────────────────
     f['syllable_count']  = base.apply(count_syllables)
 
     phon = base.apply(get_phonetic_category)
@@ -109,13 +133,16 @@ def extract_features(df: pd.DataFrame) -> pd.DataFrame:
     f['is_stop']      = (phon == 'stop').astype(int)
     f['is_vowel_end'] = (phon == 'vowel').astype(int)
 
-    # ── Suffix binary features ───────────────────────────────
-    suffixes = ['e','n','d','t','l','r','k','g','w','y',
-                'ng','nd','ld','nt','in','ow','aw','ck','ll','se']
+    # ── Suffix binary features ────────────────────────────────
+    suffixes = ['e', 'n', 'd', 't', 'l', 'r', 'k', 'g', 'w', 'y',
+                'ng', 'nd', 'ld', 'nt', 'in', 'ow', 'aw', 'ck', 'll', 'se']
     for s in suffixes:
         f[f'ends_{s}'] = base.str.endswith(s).astype(int)
 
-    # ── N-grams (label-encoded) ──────────────────────────────
+    # ── Participial heuristic ─────────────────────────────────
+    f['is_likely_participial'] = base.apply(is_likely_participial)
+
+    # ── N-grams (label-encoded) ───────────────────────────────
     le = LabelEncoder()
     f['bigram']      = le.fit_transform(base.apply(lambda w: get_ngram(w, 2)))
     f['trigram']     = le.fit_transform(base.apply(lambda w: get_ngram(w, 3)))
@@ -123,3 +150,14 @@ def extract_features(df: pd.DataFrame) -> pd.DataFrame:
     f['second_last'] = le.fit_transform(base.str[-2:-1].fillna('_'))
 
     return f
+
+
+def extract_participial_features(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Feature extraction for participial adjective forms.
+    Uses Participial_Form column instead of Base column.
+    Useful for future 3-class classifier training.
+    """
+    df_copy = df.copy()
+    df_copy['Base'] = df_copy['Participial_Form']
+    return extract_features(df_copy)
