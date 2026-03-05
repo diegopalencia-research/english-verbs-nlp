@@ -326,7 +326,7 @@ df_test['prob_irreg'] = [round(p[1]*100, 1) for p in model.predict_proba(X_test)
 
 misclassified_df = df_test[~df_test['correct']].reset_index(drop=True)
 
-    return model, metrics, X.columns.tolist(), misclassified_df
+return model, metrics, X.columns.tolist(), misclassified_df
 
 df_reg, df_irreg, df_part = load_data()
 model, METRICS, FEATURE_NAMES, MISCLASSIFIED = train_model_cached(df_reg, df_irreg)
