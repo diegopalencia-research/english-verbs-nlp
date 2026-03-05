@@ -317,11 +317,19 @@ def train_model_cached(df_reg, df_irreg):
         'train_size': len(X_train),
         'test_size':  len(X_test),
     }
-    return model, metrics, X.columns.tolist()
+    
+    df_test = df_all.iloc[X_test.index].copy()
+df_test['predicted'] = ['Irregular' if p == 1 else 'Regular' for p in y_pred]
+df_test['actual']    = ['Irregular' if a == 1 else 'Regular' for a in y_test]
+df_test['correct']   = y_pred == y_test.values
+df_test['prob_irreg'] = [round(p[1]*100, 1) for p in model.predict_proba(X_test)]
 
+misclassified_df = df_test[~df_test['correct']].reset_index(drop=True)
+
+    return model, metrics, X.columns.tolist(), misclassified_df
 
 df_reg, df_irreg, df_part = load_data()
-model, METRICS, FEATURE_NAMES = train_model_cached(df_reg, df_irreg)
+model, METRICS, FEATURE_NAMES, MISCLASSIFIED = train_model_cached(df_reg, df_irreg)
 
 # ── Chart style ────────────────────────────────────────────────────────────────
 BG   = '#060A10'
