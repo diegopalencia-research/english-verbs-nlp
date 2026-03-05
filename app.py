@@ -1552,7 +1552,8 @@ with tab_fn:
 # ═════════════════════════════════════════════════════════════════════════════
 # PAGE 6 — REFERENCE
 # ═════════════════════════════════════════════════════════════════════════════
-elif page == "/ Reference":
+
+    elif page == "/ Reference":
     st.markdown('<div class="page-title">Verb Reference</div>', unsafe_allow_html=True)
     st.markdown(f'<div class="page-sub">Complete searchable table — {len(df_reg)+len(df_irreg)} verbs · {len(df_part)} participial adjectives</div>', unsafe_allow_html=True)
 
