@@ -407,7 +407,6 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-
 # ═════════════════════════════════════════════════════════════════════════════
 # PAGE 1 — LOOKUP
 # ═════════════════════════════════════════════════════════════════════════════
@@ -415,19 +414,76 @@ if page == "/ Lookup":
     st.markdown('<div class="page-title">Verb Lookup</div>', unsafe_allow_html=True)
     st.markdown('<div class="page-sub">Any form — base · past · participle · participial adj · audio · IPA · rule</div>', unsafe_allow_html=True)
 
-    verb_input = st.text_input("", placeholder="fought   went   broken   excited   walk   organized...").lower().strip()
+    verb_input = st.text_input(
+        "",
+        placeholder="fought   went   bought   broken   excited   walk   beg..."
+    ).lower().strip()
 
     if not verb_input:
-        st.markdown("""
-        <div style="margin-top:3rem;font-family:'DM Mono',monospace;font-size:0.72rem;
-                    color:#1A2E46;line-height:2.6;letter-spacing:0.04em;">
-          Try any form — base, past, participle, or participial adjective:<br>
-          fought &nbsp;&middot;&nbsp; went &nbsp;&middot;&nbsp; bought &nbsp;&middot;&nbsp;
-          broken &nbsp;&middot;&nbsp; excited &nbsp;&middot;&nbsp; exhausted &nbsp;&middot;&nbsp;
-          walked &nbsp;&middot;&nbsp; organized &nbsp;&middot;&nbsp; google
+        # ── PAIN HOOK — shown only when input is empty ────────────────────
+        st.markdown(f"""
+        <div style="margin-top:2.5rem;">
+
+          <!-- Hook examples -->
+          <div style="display:flex;flex-direction:column;gap:0.6rem;margin-bottom:2rem;">
+            <div style="font-family:'DM Mono',monospace;font-size:0.62rem;
+                        letter-spacing:0.18em;text-transform:uppercase;
+                        color:#1E3050;margin-bottom:0.4rem;">
+              Why do these sound different?
+            </div>
+            {"".join([f'''
+            <div style="display:flex;align-items:center;gap:0.8rem;
+                        font-family:'DM Mono',monospace;">
+              <span style="color:#DCE0EA;font-size:1rem;font-weight:600;
+                           min-width:70px;">{b}</span>
+              <span style="color:#1E3050;font-size:0.85rem;">→</span>
+              <span style="color:#2E4060;font-size:0.85rem;">{ipa}</span>
+              <span style="color:#1E3050;font-size:0.85rem;">→</span>
+              <span style="color:#4A6280;font-size:0.85rem;">{past}</span>
+              <span style="color:#1E3050;font-size:0.85rem;">→</span>
+              <span class="badge {bc}" style="margin:0;">{end}</span>
+            </div>''' for b, ipa, past, end, bc in [
+                ("walk",  "/wɔːk/",   "walked",  "/t/",  "b-t"),
+                ("start", "/stɑːrt/", "started", "/ɪd/", "b-id"),
+                ("love",  "/lʌv/",    "loved",   "/d/",  "b-d"),
+            ]])}
+          </div>
+
+          <!-- The rule reveal -->
+          <div class="card" style="border-color:#1A2E46;max-width:540px;">
+            <div style="font-family:'Syne',sans-serif;font-size:1.15rem;
+                        font-weight:700;color:#F0F2F8;margin-bottom:0.6rem;
+                        line-height:1.4;">
+              There's a rule.<br>
+              <span style="color:{C1};">This app finds it — for any English verb.</span>
+            </div>
+            <div style="font-family:'DM Mono',monospace;font-size:0.75rem;
+                        color:#2E4060;line-height:2;">
+              The -ed ending has 3 different sounds determined by the<br>
+              <b style="color:#4A6280;">final phoneme</b> of the base verb — not the final letter.<br>
+              Most English learners never learn this rule explicitly.
+            </div>
+          </div>
+
+          <!-- What you can search -->
+          <div style="margin-top:1.8rem;font-family:'DM Mono',monospace;
+                      font-size:0.7rem;color:#1A2E46;line-height:2.6;
+                      letter-spacing:0.04em;">
+            <span style="color:#1E3050;font-size:0.6rem;letter-spacing:0.16em;
+                         text-transform:uppercase;">Try any form →</span><br>
+            fought &nbsp;&middot;&nbsp; went &nbsp;&middot;&nbsp; bought &nbsp;&middot;&nbsp;
+            broken &nbsp;&middot;&nbsp; excited &nbsp;&middot;&nbsp; exhausted &nbsp;&middot;&nbsp;
+            walked &nbsp;&middot;&nbsp; organized &nbsp;&middot;&nbsp;
+            <span style="color:#2E4060;">beg</span> &nbsp;&middot;&nbsp;
+            <span style="color:#2E4060;">validate</span> &nbsp;&middot;&nbsp;
+            <span style="color:#2E4060;">google</span>
+          </div>
+
         </div>
         """, unsafe_allow_html=True)
+
     else:
+        # ── Search dataset ────────────────────────────────────────────────
         row, verb_type, matched_form = find_verb(verb_input, df_reg, df_irreg, df_part)
 
         if row is not None and verb_type == 'Participial Adjective':
@@ -435,7 +491,6 @@ if page == "/ Lookup":
             sc   = row['Semantic_Class']
             bc   = SC_BADGE.get(sc, 'b-part')
             info = get_semantic_class_info(sc)
-            tests = adjective_test(row['Participial_Form'])
 
             st.markdown(f"""
             <div class="found-in">
@@ -452,8 +507,8 @@ if page == "/ Lookup":
 
             st.markdown('<span class="sec-label">Audio</span>', unsafe_allow_html=True)
             ca, cb = st.columns(2)
-            with ca: speak_button(str(row['Base_Verb']),        "Base verb",        f"bv_{verb_input}")
-            with cb: speak_button(str(row['Participial_Form']), "Participial form",  f"pf_{verb_input}")
+            with ca: speak_button(str(row['Base_Verb']),        "Base verb",       f"bv_{verb_input}")
+            with cb: speak_button(str(row['Participial_Form']), "Participial form", f"pf_{verb_input}")
 
             st.markdown('<span class="sec-label">IPA Transcription</span>', unsafe_allow_html=True)
             st.markdown(f"""
@@ -465,7 +520,7 @@ if page == "/ Lookup":
               </div>
               <div class="card-sm" style="flex:1;min-width:140px;">
                 <div style="font-family:'DM Mono',monospace;font-size:0.58rem;letter-spacing:0.14em;
-                            text-transform:uppercase;color:#1E3050;margin-bottom:0.35rem;">Participial Adjective</div>
+                            text-transform:uppercase;color:#1E3050;margin-bottom:0.35rem;">Participial Form</div>
                 <span class="ipa">{row['IPA_Adj']}</span>
                 <div style="font-family:'DM Mono',monospace;font-size:0.68rem;
                             color:#2E4060;margin-top:0.35rem;">{row['Phonetic_Adj']}</div>
@@ -486,20 +541,16 @@ if page == "/ Lookup":
                 Example: <span style="color:#DCE0EA;">{row['Example_Phrase']}</span>
               </div>
               <div style="font-family:'DM Mono',monospace;font-size:0.65rem;
-                          color:#1E3050;margin-top:0.7rem;line-height:1.9;border-top:1px solid #131D2E;padding-top:0.7rem;">
-                {row['Notes']}
-              </div>
+                          color:#1E3050;margin-top:0.7rem;border-top:1px solid #131D2E;
+                          padding-top:0.7rem;">{row['Notes']}</div>
             </div>
             """, unsafe_allow_html=True)
 
             st.markdown('<span class="sec-label">Adjective Tests</span>', unsafe_allow_html=True)
             st.markdown(f"""
             <div class="card">
-              <div style="font-family:'DM Mono',monospace;font-size:0.65rem;
-                          color:#1E3050;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:0.8rem;">
-                Is it an adjective? Apply these tests:
-              </div>
-              <div style="font-family:'DM Mono',monospace;font-size:0.76rem;color:#4A6280;line-height:2.2;">
+              <div style="font-family:'DM Mono',monospace;font-size:0.76rem;
+                          color:#4A6280;line-height:2.2;">
                 <span style="color:#2E4060;">Very test:&nbsp;</span>
                 <span style="color:#DCE0EA;">"very {row['Participial_Form']}"</span>
                 &nbsp;→ if natural, it's an adjective<br>
@@ -508,7 +559,7 @@ if page == "/ Lookup":
                 &nbsp;→ predicative adjective test<br>
                 <span style="color:#2E4060;">Attributive:&nbsp;</span>
                 <span style="color:#DCE0EA;">a {row['Participial_Form']} [noun]</span>
-                &nbsp;→ adjective before noun<br>
+                &nbsp;→ adjective before noun
               </div>
             </div>
             """, unsafe_allow_html=True)
@@ -600,8 +651,7 @@ if page == "/ Lookup":
                   <span class="badge b-irr">{vc}</span>
                   <div style="font-family:'DM Mono',monospace;font-size:0.78rem;
                               color:#4A6280;margin-top:0.75rem;line-height:1.85;">
-                    This verb does <b>not</b> follow the -ed rule.<br>
-                    It changes its internal vowel to form the past tense.
+                    This verb does <b>not</b> follow the -ed rule. It changes its internal vowel.
                     {f'<br><span style="color:#1E3050;">Examples: {ex}</span>' if ex else ''}
                   </div>
                   <div style="font-family:'DM Mono',monospace;font-size:0.65rem;
@@ -611,10 +661,10 @@ if page == "/ Lookup":
                 </div>
                 """, unsafe_allow_html=True)
 
-            # Check if this verb also has a participial adjective entry
+            # Cross-link to participial adjective if exists
             part_match = df_part[df_part['Base_Verb'].str.lower() == row['Base'].lower()]
             if not part_match.empty:
-                pm = part_match.iloc[0]
+                pm  = part_match.iloc[0]
                 bc2 = SC_BADGE.get(pm['Semantic_Class'], 'b-part')
                 st.markdown(f"""
                 <div class="card" style="border-color:#1A2E46;">
@@ -634,73 +684,170 @@ if page == "/ Lookup":
                 """, unsafe_allow_html=True)
 
         else:
-            # ── Not in dataset — ML prediction ────────────────────────────
-            st.markdown('<span class="sec-label">Not in dataset — ML Prediction</span>',
-                        unsafe_allow_html=True)
+            # ── NOT IN DATASET — try Supabase + Dictionary API ────────────
+            # Import the auto-lookup service
+            try:
+                from services.auto_lookup import auto_lookup_verb, get_supabase_stats
+                auto_available = True
+            except ImportError:
+                auto_available = False
 
-            row_df   = pd.DataFrame([{'Base': verb_input}])
-            features = extract_features(row_df)
-            prob     = model.predict_proba(features)[0]
-            label    = 'Irregular' if prob[1] > 0.5 else 'Regular'
-            conf     = max(prob) * 100
-
-            phon_cat = get_phonetic_category(verb_input)
-            sylls    = count_syllables(verb_input)
-
-            speak_button(verb_input, f"Hear '{verb_input}'", f"pred_{verb_input}")
-
-            if label == 'Regular':
-                predicted_ending = predict_ending(verb_input)
-                rule_text = get_rule_explanation(predicted_ending)
-                badge_map = {'/t/': 'b-t', '/d/': 'b-d', '/ɪd/': 'b-id'}
-                bc = badge_map.get(predicted_ending, 'b-reg')
-                st.markdown(f"""
-                <div class="card">
-                  <div style="display:flex;align-items:baseline;gap:0.8rem;margin-bottom:0.7rem;">
-                    <span class="badge b-reg">Regular</span>
-                    <span style="font-family:'DM Mono',monospace;font-size:0.65rem;
-                                 color:#1E3050;">{conf:.1f}% confidence</span>
-                  </div>
-                  <div style="font-family:'Syne',sans-serif;font-size:1.4rem;
-                              font-weight:700;color:{C4};">
-                    {verb_input} &rarr; {verb_input}ed
-                  </div>
-                  <div style="margin-top:0.6rem;">
-                    <span class="badge {bc}">{predicted_ending}</span>
-                    <span style="font-family:'DM Mono',monospace;font-size:0.72rem;
-                                 color:#3A5070;">{rule_text}</span>
-                  </div>
-                  <div style="font-family:'DM Mono',monospace;font-size:0.63rem;
-                              color:#1A2E46;margin-top:0.8rem;line-height:1.9;">
-                    Phonetic category: {phon_cat} &nbsp;&middot;&nbsp;
-                    Syllables: {sylls} &nbsp;&middot;&nbsp;
-                    Last letter: {verb_input[-1]}
-                  </div>
-                </div>
-                """, unsafe_allow_html=True)
-                speak_button(f"{verb_input}ed", f"Hear '{verb_input}ed'",
-                             f"pred_past_{verb_input}")
+            if auto_available:
+                with st.spinner(f'Searching for "{verb_input}"...'):
+                    auto_result = auto_lookup_verb(
+                        verb_input,
+                        ml_model=model,
+                        feature_extractor=extract_features
+                    )
             else:
+                auto_result = None
+
+            if auto_result is not None:
+                # ── AUTO-FOUND via Dictionary API or Supabase cache ───────
+                source     = auto_result['source']
+                verb_type  = auto_result['verb_type']
+                confidence = auto_result['confidence']
+                ending     = auto_result.get('ending', '')
+                saved      = auto_result.get('saved', False)
+                count      = auto_result.get('searched_count', 1)
+
+                badge_cls  = 'b-reg' if verb_type == 'Regular' else 'b-irr'
+                source_label = {
+                    'supabase_cache': f'Found in database · searched {count}x',
+                    'dictionary_api': 'Auto-added from Dictionary API',
+                    'local_only':     'Auto-classified (offline)',
+                }.get(source, 'Auto-classified')
+
+                icon = '🗄️' if source == 'supabase_cache' else '🔍'
+
                 st.markdown(f"""
-                <div class="card">
-                  <div style="display:flex;align-items:baseline;gap:0.8rem;margin-bottom:0.7rem;">
-                    <span class="badge b-irr">Likely Irregular</span>
-                    <span style="font-family:'DM Mono',monospace;font-size:0.65rem;
-                                 color:#1E3050;">{conf:.1f}% confidence</span>
-                  </div>
-                  <div style="font-family:'DM Mono',monospace;font-size:0.78rem;
-                              color:#4A6280;line-height:1.85;">
-                    This verb likely has an unpredictable past form.<br>
-                    Check a dictionary for the correct conjugation.
-                  </div>
-                  <div style="font-family:'DM Mono',monospace;font-size:0.63rem;
-                              color:#1A2E46;margin-top:0.8rem;">
-                    Phonetic category: {phon_cat} &nbsp;&middot;&nbsp; Syllables: {sylls}
-                  </div>
+                <div style="font-family:'DM Mono',monospace;font-size:0.68rem;
+                            color:#2E4060;letter-spacing:0.1em;text-transform:uppercase;
+                            margin-bottom:0.6rem;">
+                  {icon} {source_label}
+                  &nbsp;·&nbsp;
+                  <span class="badge {badge_cls}" style="font-size:0.6rem;">{verb_type}</span>
+                  <span style="color:#1A2E46;"> · {confidence:.0f}% confidence</span>
+                  {"&nbsp;·&nbsp;<span style='color:#7DCBA8;'>saved ✓</span>" if saved else ""}
                 </div>
                 """, unsafe_allow_html=True)
 
+                c1, c2, c3 = st.columns(3)
+                c1.metric("Base Form",       auto_result['base'])
+                c2.metric("Simple Past",     auto_result['simple_past'])
+                c3.metric("Past Participle", auto_result['past_participle'])
 
+                st.markdown('<span class="sec-label">Audio</span>', unsafe_allow_html=True)
+                ca, cb, cc = st.columns(3)
+                with ca: speak_button(auto_result['base'],            "Base form",      f"ab_{verb_input}")
+                with cb: speak_button(auto_result['simple_past'],     "Simple past",    f"ap_{verb_input}")
+                with cc: speak_button(auto_result['past_participle'], "Past participle",f"app_{verb_input}")
+
+                st.markdown('<span class="sec-label">IPA</span>', unsafe_allow_html=True)
+                st.markdown(f"""
+                <div class="card-sm" style="display:inline-block;margin-bottom:0.5rem;">
+                  <div style="font-family:'DM Mono',monospace;font-size:0.58rem;letter-spacing:0.14em;
+                              text-transform:uppercase;color:#1E3050;margin-bottom:0.35rem;">Base</div>
+                  <span class="ipa">{auto_result['ipa_base']}</span>
+                </div>
+                """, unsafe_allow_html=True)
+
+                if verb_type == 'Regular' and ending:
+                    rule_text = get_rule_explanation(ending)
+                    badge_map = {'/t/': 'b-t', '/d/': 'b-d', '/ɪd/': 'b-id'}
+                    bc = badge_map.get(ending, 'b-reg')
+                    st.markdown('<span class="sec-label">Phonetic Rule</span>', unsafe_allow_html=True)
+                    st.markdown(f"""
+                    <div class="card">
+                      <span class="badge {bc}">{ending}</span>
+                      <span style="font-family:'DM Mono',monospace;font-size:0.65rem;color:#1E3050;">
+                        last sound: {auto_result.get('last_sound', '')}
+                      </span>
+                      <div style="font-family:'DM Mono',monospace;font-size:0.76rem;
+                                  color:#4A6280;margin-top:0.7rem;line-height:1.85;">
+                        {rule_text}
+                      </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                if source == 'dictionary_api':
+                    st.markdown(f"""
+                    <div style="font-family:'DM Mono',monospace;font-size:0.65rem;
+                                color:#1A2E46;margin-top:0.5rem;line-height:1.9;">
+                      This verb was automatically fetched, classified, and saved.
+                      Next time someone searches <b style="color:#2E4060;">{verb_input}</b>,
+                      it will load instantly from the database.
+                    </div>
+                    """, unsafe_allow_html=True)
+
+            else:
+                # ── Fully unknown — pure ML prediction ───────────────────
+                st.markdown('<span class="sec-label">Not found — ML Prediction</span>',
+                            unsafe_allow_html=True)
+
+                import pandas as pd
+                row_df   = pd.DataFrame([{'Base': verb_input}])
+                features = extract_features(row_df)
+                prob     = model.predict_proba(features)[0]
+                label    = 'Irregular' if prob[1] > 0.5 else 'Regular'
+                conf     = max(prob) * 100
+
+                phon_cat = get_phonetic_category(verb_input)
+                sylls    = count_syllables(verb_input)
+
+                speak_button(verb_input, f"Hear '{verb_input}'", f"pred_{verb_input}")
+
+                if label == 'Regular':
+                    predicted_ending = predict_ending(verb_input)
+                    rule_text = get_rule_explanation(predicted_ending)
+                    badge_map = {'/t/': 'b-t', '/d/': 'b-d', '/ɪd/': 'b-id'}
+                    bc = badge_map.get(predicted_ending, 'b-reg')
+                    st.markdown(f"""
+                    <div class="card">
+                      <div style="display:flex;align-items:baseline;gap:0.8rem;margin-bottom:0.7rem;">
+                        <span class="badge b-reg">Regular</span>
+                        <span style="font-family:'DM Mono',monospace;font-size:0.65rem;
+                                     color:#1E3050;">{conf:.1f}% confidence</span>
+                      </div>
+                      <div style="font-family:'Syne',sans-serif;font-size:1.4rem;
+                                  font-weight:700;color:{C4};">
+                        {verb_input} &rarr; {verb_input}ed
+                      </div>
+                      <div style="margin-top:0.6rem;">
+                        <span class="badge {bc}">{predicted_ending}</span>
+                        <span style="font-family:'DM Mono',monospace;font-size:0.72rem;
+                                     color:#3A5070;">{rule_text}</span>
+                      </div>
+                      <div style="font-family:'DM Mono',monospace;font-size:0.63rem;
+                                  color:#1A2E46;margin-top:0.8rem;line-height:1.9;">
+                        Phonetic category: {phon_cat} &nbsp;&middot;&nbsp;
+                        Syllables: {sylls} &nbsp;&middot;&nbsp;
+                        Last letter: {verb_input[-1]}
+                      </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    speak_button(f"{verb_input}ed", f"Hear '{verb_input}ed'",
+                                 f"pred_past_{verb_input}")
+                else:
+                    st.markdown(f"""
+                    <div class="card">
+                      <div style="display:flex;align-items:baseline;gap:0.8rem;margin-bottom:0.7rem;">
+                        <span class="badge b-irr">Likely Irregular</span>
+                        <span style="font-family:'DM Mono',monospace;font-size:0.65rem;
+                                     color:#1E3050;">{conf:.1f}% confidence</span>
+                      </div>
+                      <div style="font-family:'DM Mono',monospace;font-size:0.78rem;
+                                  color:#4A6280;line-height:1.85;">
+                        This verb likely has an unpredictable past form.<br>
+                        Check a dictionary for the correct conjugation.
+                      </div>
+                      <div style="font-family:'DM Mono',monospace;font-size:0.63rem;
+                                  color:#1A2E46;margin-top:0.8rem;">
+                        Phonetic category: {phon_cat} &nbsp;&middot;&nbsp; Syllables: {sylls}
+                      </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
 # ═════════════════════════════════════════════════════════════════════════════
 # PAGE 2 — PHONETIC EXPLORER
 # ═════════════════════════════════════════════════════════════════════════════
@@ -1290,3 +1437,174 @@ elif page == "/ Reference":
                     'Semantic_Class','Example_Phrase','Notes']].reset_index(drop=True),
             use_container_width=True, height=520
         )
+
+# ─── Add to Model Performance page ────────────────────────────────────────────
+
+st.markdown('<span class="sec-label">Misclassification Analysis</span>',
+            unsafe_allow_html=True)
+
+# Build misclassified df from test data
+# (inline version — works without modifying train_model_cached)
+df_all_for_analysis = pd.concat([df_reg, df_irreg], ignore_index=True)
+X_analysis = extract_features(df_all_for_analysis)
+y_analysis = (df_all_for_analysis['Type'] == 'Irregular').astype(int)
+
+from sklearn.model_selection import train_test_split
+X_tr, X_te, y_tr, y_te = train_test_split(
+    X_analysis, y_analysis, test_size=0.20, random_state=42, stratify=y_analysis
+)
+
+y_pred_analysis = model.predict(X_te)
+probs_analysis  = model.predict_proba(X_te)
+
+df_test = df_all_for_analysis.loc[X_te.index].copy()
+df_test['Predicted']    = ['Irregular' if p == 1 else 'Regular' for p in y_pred_analysis]
+df_test['Actual']       = ['Irregular' if a == 1 else 'Regular' for a in y_te]
+df_test['Correct']      = y_pred_analysis == y_te.values
+df_test['Prob_Irreg_%'] = [round(p[1]*100, 1) for p in probs_analysis]
+df_test['Error_Type']   = df_test.apply(
+    lambda r: 'FP — said Irregular' if (r['Predicted']=='Irregular' and r['Actual']=='Regular')
+              else ('FN — said Regular' if (r['Predicted']=='Regular' and r['Actual']=='Irregular')
+                    else 'Correct'),
+    axis=1
+)
+
+misclassified = df_test[~df_test['Correct']].reset_index(drop=True)
+fp_mask = misclassified['Error_Type'].str.startswith('FP')
+fn_mask = misclassified['Error_Type'].str.startswith('FN')
+
+n_errors = len(misclassified)
+n_fp     = fp_mask.sum()
+n_fn     = fn_mask.sum()
+
+st.markdown(f"""
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.8rem;margin-bottom:1.2rem;">
+  <div class="card-sm" style="text-align:center;">
+    <div style="font-family:'Syne',sans-serif;font-size:1.6rem;
+                font-weight:800;color:{C2};">{n_errors}</div>
+    <div style="font-family:'DM Mono',monospace;font-size:0.6rem;
+                color:#1E3050;text-transform:uppercase;letter-spacing:0.12em;">
+      Total Errors
+    </div>
+  </div>
+  <div class="card-sm" style="text-align:center;">
+    <div style="font-family:'Syne',sans-serif;font-size:1.6rem;
+                font-weight:800;color:{C3};">{n_fp}</div>
+    <div style="font-family:'DM Mono',monospace;font-size:0.6rem;
+                color:#1E3050;text-transform:uppercase;letter-spacing:0.12em;">
+      False Positives<br>
+      <span style="color:#1A2E46;font-size:0.55rem;">Said Irregular, was Regular</span>
+    </div>
+  </div>
+  <div class="card-sm" style="text-align:center;">
+    <div style="font-family:'Syne',sans-serif;font-size:1.6rem;
+                font-weight:800;color:{C1};">{n_fn}</div>
+    <div style="font-family:'DM Mono',monospace;font-size:0.6rem;
+                color:#1E3050;text-transform:uppercase;letter-spacing:0.12em;">
+      False Negatives<br>
+      <span style="color:#1A2E46;font-size:0.55rem;">Said Regular, was Irregular</span>
+    </div>
+  </div>
+</div>
+""", unsafe_allow_html=True)
+
+tab_all, tab_fp, tab_fn = st.tabs([
+    f"All errors ({n_errors})",
+    f"False Positives ({n_fp})",
+    f"False Negatives ({n_fn})",
+])
+
+display_cols = ['Base', 'Type', 'Predicted', 'Prob_Irreg_%', 'Error_Type']
+
+with tab_all:
+    if n_errors > 0:
+        st.dataframe(
+            misclassified[display_cols].rename(columns={
+                'Type': 'Actual', 'Prob_Irreg_%': 'P(Irregular)%'
+            }),
+            use_container_width=True, height=min(n_errors * 38 + 40, 400)
+        )
+        # Pattern analysis
+        if n_errors >= 3:
+            st.markdown('<span class="sec-label">Why does the model fail? Pattern Analysis</span>',
+                        unsafe_allow_html=True)
+            # Ending letter distribution of errors
+            misclassified['last_letter'] = misclassified['Base'].str[-1]
+            lc = misclassified['last_letter'].value_counts().head(8)
+
+            fig, ax = plt.subplots(figsize=(8, 3))
+            sax(ax, fig)
+            ax.bar(lc.index, lc.values, color=C2, edgecolor=BG, linewidth=2, width=0.5)
+            for i, (ch, v) in enumerate(lc.items()):
+                ax.text(i, v + 0.05, str(v), ha='center', fontsize=10,
+                        fontweight='bold', color='#8096B8')
+            ax.set_title('Final Letter of Misclassified Verbs', fontsize=10, pad=10)
+            ax.set_xlabel('Last letter', fontsize=8)
+            for sp in ax.spines.values(): sp.set_visible(False)
+            ax.tick_params(bottom=False)
+            plt.tight_layout()
+            st.pyplot(fig)
+
+            st.markdown(f"""
+            <div class="card" style="margin-top:0.5rem;">
+              <div style="font-family:'DM Mono',monospace;font-size:0.62rem;
+                          letter-spacing:0.14em;text-transform:uppercase;
+                          color:#1E3050;margin-bottom:0.6rem;">Why the model struggles</div>
+              <div style="font-family:'DM Mono',monospace;font-size:0.75rem;
+                          color:#4A6280;line-height:2;">
+                The Random Forest uses <b style="color:#DCE0EA;">spelling features only</b>
+                — it cannot know verb etymology or historical derivation.<br>
+                Short verbs ending in consonants (cut, put, set, hit) <i>look</i> like regular
+                verbs to the model but are irregular.<br>
+                Conversely, some long regular verbs (validate, organize) share letter patterns
+                with irregular forms and confuse the classifier.<br>
+                <span style="color:#2E4060;">Solution: adding etymology features
+                (Old English vs Latin origin) would likely push accuracy above 85%.</span>
+              </div>
+            </div>
+            """, unsafe_allow_html=True)
+    else:
+        st.markdown('<div style="font-family:DM Mono,monospace;color:#1E3050;'
+                    'font-size:0.75rem;">No errors in test set.</div>',
+                    unsafe_allow_html=True)
+
+with tab_fp:
+    if n_fp > 0:
+        st.markdown(f"""
+        <div style="font-family:'DM Mono',monospace;font-size:0.72rem;
+                    color:#2E4060;margin-bottom:0.8rem;line-height:1.9;">
+          These are <b>regular verbs</b> the model predicted as irregular.<br>
+          Common cause: short CVC words (look/cook/hook) share patterns with
+          irregular verbs (take/make).
+        </div>
+        """, unsafe_allow_html=True)
+        fp_df = misclassified[fp_mask][display_cols].rename(
+            columns={'Type': 'Actual', 'Prob_Irreg_%': 'P(Irregular)%'}
+        )
+        st.dataframe(fp_df, use_container_width=True,
+                     height=min(n_fp * 38 + 40, 380))
+    else:
+        st.markdown('<div style="font-family:DM Mono,monospace;color:#1E3050;'
+                    'font-size:0.75rem;">No false positives.</div>',
+                    unsafe_allow_html=True)
+
+with tab_fn:
+    if n_fn > 0:
+        st.markdown(f"""
+        <div style="font-family:'DM Mono',monospace;font-size:0.72rem;
+                    color:#2E4060;margin-bottom:0.8rem;line-height:1.9;">
+          These are <b>irregular verbs</b> the model predicted as regular.<br>
+          Common cause: short vowel-change verbs (cut, put, set) look like
+          regular verbs from spelling alone.
+        </div>
+        """, unsafe_allow_html=True)
+        fn_df = misclassified[fn_mask][display_cols].rename(
+            columns={'Type': 'Actual', 'Prob_Irreg_%': 'P(Irregular)%'}
+        )
+        st.dataframe(fn_df, use_container_width=True,
+                     height=min(n_fn * 38 + 40, 380))
+    else:
+        st.markdown('<div style="font-family:DM Mono,monospace;color:#1E3050;'
+                    'font-size:0.75rem;">No false negatives.</div>',
+                    unsafe_allow_html=True)
+
