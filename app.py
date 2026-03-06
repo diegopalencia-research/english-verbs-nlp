@@ -488,29 +488,30 @@ def render_pattern_card(vowel_change: str) -> str:
     tip      = info['tip']
     examples = info['examples']
 
-   # ── Build phonetic arrow diagram ─────────────────────────────────────
-# Split on → to get the IPA symbols for each form
-parts = [p.strip() for p in vowel_change.split('\u2192')]
-labels = ['base form', 'simple past', 'past part.'][:len(parts)]
+    # ── Build phonetic arrow diagram ─────────────────────────────────────
+    # Split on → to get the IPA symbols for each form
+    parts  = [p.strip() for p in vowel_change.split('\u2192')]
+    labels = ['base form', 'simple past', 'past part.'][:len(parts)]
 
-boxes = []
-for i, (sym, lbl) in enumerate(zip(parts, labels)):
-    sym_color = '#DCE0EA' if i == 0 else color
-    boxes.append(f"""
-    <div style="text-align:center;min-width:60px;">
-        <div style="font-family:'Noto Sans','Segoe UI',Arial,sans-serif;
-                    font-size:1.75rem;font-weight:600;
-                    color:{sym_color};line-height:1.1;">{sym}</div>
-        <div style="font-family:'DM Mono',monospace;font-size:0.52rem;
-                    color:#1A2E46;text-transform:uppercase;
-                    letter-spacing:0.1em;margin-top:0.3rem;">{lbl}</div>
-    </div>""")
+    boxes = []
+    for i, (sym, lbl) in enumerate(zip(parts, labels)):
+        sym_color = '#DCE0EA' if i == 0 else color
+        boxes.append(f"""
+        <div style="text-align:center;min-width:60px;">
+          <div style="font-family:'Noto Sans','Segoe UI',Arial,sans-serif;
+                      font-size:1.75rem;font-weight:600;
+                      color:{sym_color};line-height:1.1;">{sym}</div>
+          <div style="font-family:'DM Mono',monospace;font-size:0.52rem;
+                      color:#1A2E46;text-transform:uppercase;
+                      letter-spacing:0.1em;margin-top:0.3rem;">{lbl}</div>
+        </div>""")
 
-# Alpha Agent Fix: Triple quotes eliminate the need for backslash escaping,
-# maintaining the integrity of the HTML and Python syntax simultaneously.
-arrow_sep = """<div style="font-family:'Noto Sans',sans-serif;font-size:1.2rem;color:#1A2E46;padding:0 0.4rem;align-self:flex-start;padding-top:0.35rem;">\u2192</div>"""
-
-arrow_row = arrow_sep.join(boxes)
+    arrow_sep = (
+        '<div style="font-family:\\'Noto Sans\\',sans-serif;font-size:1.2rem;'
+        'color:#1A2E46;padding:0 0.4rem;align-self:flex-start;'
+        'padding-top:0.35rem;">\u2192</div>'
+    )
+    arrow_row = arrow_sep.join(boxes)
 
     # ── Build example pairs/trios ────────────────────────────────────────
     ex_parts = []
