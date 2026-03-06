@@ -2,64 +2,102 @@
 
 ---
 
-A full-stack AI application combining linguistics, machine learning, and data science to analyze English verb morphology and phonetic behavior.
-
-Built around a structured dataset of **298 English verbs** (160 regular, 138 irregular), enriched with IPA transcriptions, phonetic encodings, morphological features, and pronunciation rules.
+> *"Walk" → /wɔːk/ → walked → /t/*  
+> *"Start" → /stɑːrt/ → started → /ɪd/*  
+> *"Love" → /lʌv/ → loved → /d/*  
+>
+> Why do these sound different? There's a rule. This app finds it — for any English verb.
 
 ---
 
-## What It Does
+## The Problem
 
-- **Lemmatizer** — resolves any conjugated form to its base verb (`fought` → `fight`, `went` → `go`, `broken` → `break`)
-- **Phonetic Rule Engine** — predicts -ed pronunciation (`/t/`, `/d/`, `/ɪd/`) from phonetic features
-- **IPA Display** — full transcription for base form, simple past, and past participle
-- **Audio Pronunciation** — browser-native speech synthesis for all three verb forms
-- **ML Classifier** — classifies unknown verbs as regular or irregular with confidence score
-- **Model Dashboard** — live accuracy, precision, recall, F1, confusion matrix, and feature importance
+English past tense pronunciation follows a hidden phonetic rule that most learners — and most teachers — never make explicit. The -ed suffix has three distinct sounds, and which one applies is determined entirely by the final **phoneme** of the base verb, not the final letter.
+
+This system makes that logic searchable, audible, and machine-verifiable. It is grounded in Chomsky & Halle (1968) and validated with a trained Random Forest classifier on a custom 473-entry dataset.
 
 ---
 
 ## Key Findings
 
-- **47.5%** of regular verbs follow the `/d/` ending — the most common past tense sound
-- **28.1%** follow `/t/` (voiceless consonants: walk → walkt, cook → cookt)
-- **24.4%** follow `/ɪd/` — verbs ending in /t/ or /d/ add an extra syllable (start → startid)
-- The most frequent irregular pattern is **"no vowel change"** (cut/cut, put/put, hit/hit) — 20 verbs
-- Second most frequent: **iː → ɛ** (feel/felt, keep/kept, sleep/slept) — 19 verbs
-- **Irregular verbs are shorter on average** — 4.4 letters vs 5.5 for regular verbs, reflecting Old English monosyllabic roots
-- The **Random Forest classifier reaches 75.0% accuracy** distinguishing regular from irregular verbs using spelling features alone — outperforming the 54% random baseline by 21 percentage points
-- Top predictive features: second-to-last character, verb length, consonant count, vowel count, last letter
+- **47.5%** of regular verbs follow the `/d/` ending (~151 of 317) — the most common past tense sound, produced by voiced consonants and vowels
+- **28.1%** follow `/t/` (~89 verbs) — voiceless consonants: walk → walk**t**, cook → cook**t**, push → push**t**
+- **24.4%** follow `/ɪd/` (~77 verbs) — verbs ending in /t/ or /d/ must insert an extra syllable to separate identical sounds: start → start**id**
+- The most frequent irregular pattern is **"no vowel change"** (cut/cut, put/put, hit/hit) — these look regular but aren't
+- Second most frequent irregular pattern: **iː → ɛ** (feel/felt, keep/kept, sleep/slept) — 19 verbs
+- **Irregular verbs are shorter on average** — reflecting Old English monosyllabic roots. The 10 most frequent English verbs are all irregular
+- **Emotional state** is the largest participial adjective class (24 of 76 entries) — *excited, bored, exhausted, worried* — all describe the experiencer, not a physical condition
+- **33% of the dataset is irregular** — yet most new English verbs coined after 1900 are regular. Frequency, not age, predicts irregularity
+- The **Random Forest reaches ~75% accuracy** distinguishing regular from irregular verbs using spelling features alone — outperforming the 54% majority-class baseline by 21 percentage points
+- **Top predictive features:** second-to-last character · verb length · consonant count · vowel count · last letter. Etymology is not a feature — this is the main source of remaining error
+
+---
+
+## What It Does
+
+| Feature | Description |
+|---|---|
+| **Lemmatizer** | Resolves any conjugated form to its base — `fought → fight`, `went → go`, `broken → break` |
+| **Phonetic rule engine** | Predicts -ed ending (`/t/`, `/d/`, `/ɪd/`) from the final phoneme |
+| **IPA display** | Full transcription for base, simple past, and past participle |
+| **Audio** | Browser speech synthesis for every verb form |
+| **ML classifier** | Classifies any unknown verb as regular or irregular — Random Forest, ~75% accuracy |
+| **Participial adjectives** | 76 entries across 4 semantic classes with linguistic classification tests |
+| **Auto-add pipeline** | Unknown verbs fetched from Dictionary API, classified, saved to Supabase automatically |
+| **Model dashboard** | Accuracy, confusion matrix, feature importance, and misclassification analysis |
+
+---
+
+## The Phonetic Rule
+
+When a regular verb takes **-ed**, pronunciation is determined by the **final sound** of the base form — not the final letter:
+
+| Final Sound | -ed Pronounced As | Example |
+|---|---|---|
+| Voiceless (p, k, f, s, sh, ch) | **/t/** | walk → walk**t** |
+| Voiced (vowels, b, g, v, z, m, n, l, r) | **/d/** | call → call**d** |
+| /t/ or /d/ | **/ɪd/** (extra syllable) | start → start**id** |
+
+Rule formalized in Chomsky & Halle (1968). Validated here with supervised ML on a custom phonetic dataset.
 
 ---
 
 ## Dataset
 
-| Property | Value |
-|---|---|
-| Total verbs | 298 |
-| Regular verbs | 160 |
-| Irregular verbs | 138 |
-| Features per verb | IPA (3), Phonetic encoding (3), Last sound, -ed ending, Vowel change pattern |
-| Source | Custom structured dataset — manually curated |
+| Sheet | Entries | Key Columns |
+|---|---|---|
+| Regular Verbs | 317 | Base, Past, Participle, IPA×3, Phonetic×3, Last Sound, Ending |
+| Irregular Verbs | 156 | Base, Past, Participle, IPA×3, Phonetic×3, Vowel Change |
+| Participial Adjectives | 76 | Base Verb, Form, IPA×2, Semantic Class, Example, Notes |
+| **Total** | **473** | — |
+
+Dataset built manually. Not sourced from a tutorial or pre-existing corpus.
 
 ---
 
-## ML Model
+## Model Performance
 
-```
-Algorithm:     Random Forest Classifier
-Estimators:    200 decision trees
-Max depth:     8
-Validation:    5-fold stratified cross-validation
-Train/Test:    80 / 20 split (stratified)
+| Metric | Score |
+|---|---|
+| Accuracy | ~75% |
+| Precision (weighted) | ~76% |
+| Recall (weighted) | ~75% |
+| F1 (weighted) | ~75% |
+| CV Mean (5-fold) | ~74% |
+| Baseline (majority class) | 54% |
+| **Over baseline** | **+21 pp** |
 
-Accuracy:      75.0%  (Random Forest)
-Comparison:    66.7%  (Logistic Regression)
-Baseline:      54.0%  (majority class — random)
-Improvement:   +21 percentage points over baseline
-```
+---
 
-**25 engineered features:** length · vowel_count · consonant_count · syllable_count · phonetic_category (voiced/voiceless/stop/vowel) · is_voiceless · is_voiced · is_stop · is_vowel_end · 20 binary suffix patterns · bigram · trigram · last_letter · second_last
+## ML Features (26 total)
+
+**Structural:** `length` · `vowel_count` · `consonant_count`
+
+**Phonetic:** `syllable_count` · `phonetic_category` · `is_voiceless` · `is_voiced` · `is_stop` · `is_vowel_end` · `is_likely_participial`
+
+**Suffix binary (20):** `ends_e` · `ends_n` · `ends_d` · `ends_t` · `ends_l` · `ends_r` · `ends_k` · `ends_g` · `ends_w` · `ends_y` · `ends_ng` · `ends_nd` · `ends_ld` · `ends_nt` · `ends_in` · `ends_ow` · `ends_aw` · `ends_ck` · `ends_ll` · `ends_se`
+
+**N-gram:** `bigram` · `trigram` · `last_letter` · `second_last`
 
 ---
 
@@ -67,24 +105,143 @@ Improvement:   +21 percentage points over baseline
 
 ```
 english-verbs-nlp/
-├── app.py                         Main Streamlit application (5 pages)
+├── app.py                        Streamlit app — 6 pages
 ├── services/
-│   ├── lemmatizer.py              Multi-form verb search (base/past/participle)
-│   ├── preprocessing.py           Feature engineering pipeline — 25 features
-│   └── phonetics.py               Rule-based -ed pronunciation prediction
+│   ├── lemmatizer.py             Multi-form search + participial adjective support
+│   ├── preprocessing.py          26-feature engineering pipeline
+│   ├── phonetics.py              Rule-based -ed prediction + semantic class info
+│   └── auto_lookup.py            Supabase + Dictionary API auto-add service
 ├── scripts/
-│   ├── train_model.py             Reproducible training — outputs metrics.json
-│   └── evaluate_model.py          Standalone evaluation report
+│   └── train_model.py            Standalone training → classifier.pkl + metrics.json
 ├── models/
-│   ├── classifier.pkl             Trained RandomForest (serialized)
-│   └── metrics.json               Evaluation metrics (machine-readable)
+│   ├── classifier.pkl            Trained RandomForest (200 estimators, depth 8)
+│   ├── metrics.json              Evaluation metrics (machine-readable)
+│   └── feature_names.json        Feature column names for inference
+├── tests/
+│   └── test_services.py          68 unit tests — phonetics, preprocessing, lemmatizer
 ├── data/
-│   └── english_verbs.xlsx         298-verb dataset (2 sheets)
-├── notebooks/
-│   └── analysis.ipynb             Full EDA + ML notebook (16 cells)
-├── README.md
-└── requirements.txt
-└── License.md
+│   └── english_verbs.xlsx        473-entry dataset — 5 sheets
+├── requirements.txt
+└── README.md
+```
+
+---
+
+## Setup
+
+```bash
+git clone https://github.com/diegopalencia-research/english-verbs-nlp.git
+cd english-verbs-nlp
+pip install -r requirements.txt
+python scripts/train_model.py     # generates models/classifier.pkl
+streamlit run app.py
+python -m pytest tests/ -v        # run 68 unit tests
+```
+
+For Supabase auto-add, create `.streamlit/secrets.toml`:
+
+```toml
+SUPABASE_URL = "https://your-project.supabase.co"
+SUPABASE_KEY = "your-anon-key"
+```
+---
+
+## Architecture
+
+```mermaid
+flowchart TD
+    A[User Input — any verb form] --> B{lemmatizer.py\nfind_verb}
+
+    B -->|Regular| C[IPA · audio · -ed rule]
+    B -->|Irregular| D[IPA · audio · vowel pattern]
+    B -->|Participial Adj| E[Semantic class · adj tests]
+    B -->|Not found| F{auto_lookup.py}
+
+    F -->|Supabase hit| G[Cached — instant]
+    F -->|New verb| H[dictionaryapi.dev]
+    H --> I[phonetics.py\npredict_ending]
+    H --> J[Random Forest]
+    I --> K[Supabase PostgreSQL]
+    J --> K
+    K --> L[Result + rule + ending]
+
+    subgraph preprocessing.py
+      M[26 features: length · syllables\nphonetic_category · suffix patterns\nbigram · trigram · is_likely_participial]
+    end
+
+    J --> preprocessing.py
+    preprocessing.py --> J
+```
+
+---
+
+## Auto-Add Pipeline
+
+When a user searches a verb not in the local dataset:
+
+```
+1. Check Supabase (PostgreSQL)   → instant if previously searched
+2. Call dictionaryapi.dev        → free, no API key required
+3. Apply phonetic rule engine    → predict -ed ending
+4. Run ML classifier             → predict regular / irregular
+5. Save to Supabase              → automatically
+6. Return result to user         → with IPA, rule, and audio
+7. Next user gets it instantly   → from database cache
+```
+
+The app grows its own database from user searches. No manual intervention needed.
+
+---
+
+## Participial Adjectives
+
+Past participles functioning as adjectives, classified into 4 semantic categories.
+
+| Class | Count | Examples |
+|---|---|---|
+| Emotional state | 24 | excited · bored · exhausted · worried |
+| Physical state | 15 | broken · frozen · torn · swollen |
+| Process result | 19 | cooked · printed · trained · updated |
+| Ambiguous | 18 | experienced · advanced · limited · mixed |
+
+**Classification tests:**
+- *Very test* — `"very excited"` ✓ natural → adjective
+- *Seem test* — `"seem exhausted"` ✓ predicative adjective
+- *Attributive* — `"a broken window"` ✓ adjective before noun
+
+---
+
+## Why the Model Fails (~25%)
+
+The classifier uses spelling features only — it has no access to etymology. Short CVC verbs like *cut*, *put*, *hit*, *set* look identical to regular verbs from orthography alone but are irregular. Adding etymology features (Old English vs Latin/French origin) would likely push accuracy above 85%. This is the stated next research direction.
+
+---
+
+## Architecture
+
+```mermaid
+flowchart TD
+    A[User Input — any verb form] --> B{lemmatizer.py\nfind_verb}
+
+    B -->|Regular| C[IPA · audio · -ed rule]
+    B -->|Irregular| D[IPA · audio · vowel pattern]
+    B -->|Participial Adj| E[Semantic class · adj tests]
+    B -->|Not found| F{auto_lookup.py}
+
+    F -->|Supabase hit| G[Cached — instant]
+    F -->|New verb| H[dictionaryapi.dev]
+    H --> I[phonetics.py\npredict_ending]
+    H --> J[Random Forest]
+    I --> K[Supabase PostgreSQL]
+    J --> K
+    K --> L[Result + rule + ending]
+
+    subgraph preprocessing.py
+      M[26 features: length · syllables\nphonetic_category · suffix patterns\nbigram · trigram · is_likely_participial]
+    end
+
+    J --> preprocessing.py
+    preprocessing.py --> J
 ```
 
 ---
@@ -101,50 +258,16 @@ english-verbs-nlp/
 
 ---
 
-## Setup
-
-```bash
-git clone https://github.com/diegopalencia-research/english-verbs-nlp.git
-cd english-verbs-nlp
-pip install -r requirements.txt
-streamlit run app.py
-```
-
-Retrain the model:
-```bash
-python scripts/train_model.py
-```
-
-Evaluate:
-```bash
-python scripts/evaluate_model.py
-```
-
----
-
-## The Phonetic Rule
-
-When a regular verb takes **-ed**, pronunciation is determined by the **final sound** of the base form — not the final letter:
-
-| Final Sound | -ed Sound | Examples |
-|---|---|---|
-| Voiceless (p, k, f, s, sh, ch) | **/t/** | walk → walkt · cook → cookt |
-| Voiced (vowels, b, g, v, z, m, n, l, r) | **/d/** | call → calld · love → loved |
-| /t/ or /d/ | **/ɪd/** | start → startid · need → needid |
-
-Rule formalized in Chomsky & Halle (1968) — validated here with supervised ML.
-
----
-
 ## Research Foundation
 
 > *Can phonetic features predict morphological class in English verbs?*
 
-- **Chomsky & Halle (1968)** — *The Sound Pattern of English* — phonological voicing rules for -ed allomorphy
-- **Rumelhart & McClelland (1986)** — past tense acquisition using connectionist networks — benchmark for this task
-- **Berko (1958)** — Wug test — productive rule application in English morphology
+- **Chomsky & Halle (1968)** — *The Sound Pattern of English* — formalization of -ed allomorphy rules
+- **Rumelhart & McClelland (1986)** — connectionist past tense benchmark — replicated here with Random Forest
+- **Pinker & Prince (1988)** — rule/exception distinction motivating the classification task
+- **Berko (1958)** — Wug test — productive morphological rule application in English
 
-Preprint in preparation — OSF Preprints.
+Part of a unified preprint: *Computational Feature Extraction for Human Performance Prediction* (OSF Preprints, in preparation).
 
 ---
 
@@ -157,8 +280,9 @@ matplotlib>=3.7
 seaborn>=0.12
 scikit-learn>=1.3
 streamlit>=1.28
-scipy>=1.10
 numpy>=1.24
+requests>=2.28
+supabase>=2.0
 ```
 
 ---
@@ -203,3 +327,13 @@ The call center context serves as an empirical domain for testing whether tempor
 ## License
 
 MIT License
+
+
+
+
+
+
+
+
+
+
