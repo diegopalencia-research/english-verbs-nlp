@@ -512,7 +512,7 @@ def render_pattern_card(vowel_change: str) -> str:
         'padding-top:0.35rem;">\u2192</div>'
         """
     )
-    st.markdown(arrow_row, unsafe_allow_html=True)
+    arrow_row = arrow_sep.join(boxes)
 
     # ── Build example pairs/trios ────────────────────────────────────────
     ex_parts = []
