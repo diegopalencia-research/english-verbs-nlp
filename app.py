@@ -33,9 +33,11 @@ st.set_page_config(
 )
 
 # ── Design system ──────────────────────────────────────────────────────────────
+# PHASE 1 FIX: Added Noto Sans to the Google Fonts import — it has full IPA
+# Unicode coverage that DM Mono lacks. The .ipa class now uses it as primary font.
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Syne:wght@400;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Noto+Sans:ital,wght@0,400;0,600;1,400&family=Syne:wght@400;600;700;800&display=swap');
 
 html, body, [class*="css"] {
     font-family: 'Syne', sans-serif;
@@ -98,8 +100,10 @@ html, body, [class*="css"] {
     border-radius: 3px;
     padding: 0.9rem 1.1rem;
 }
+
+/* PHASE 1 FIX: .ipa now uses Noto Sans as primary so all IPA chars render correctly */
 .ipa {
-    font-family: 'DM Mono', monospace;
+    font-family: 'Noto Sans', 'Segoe UI', Arial, sans-serif;
     font-size: 0.95rem;
     color: #5B9EC9;
     background: rgba(91,158,201,0.08);
@@ -109,6 +113,15 @@ html, body, [class*="css"] {
     display: inline-block;
     letter-spacing: 0.03em;
 }
+
+/* PHASE 1 NEW: pattern card specific IPA rendering */
+.pat-ipa {
+    font-family: 'Noto Sans', 'Segoe UI', Arial, sans-serif;
+    font-size: 1.7rem;
+    font-weight: 600;
+    line-height: 1.1;
+}
+
 .badge {
     display: inline-block;
     font-family: 'DM Mono', monospace;
@@ -202,7 +215,7 @@ html, body, [class*="css"] {
 .stat-sub  { font-family:'DM Mono',monospace; font-size:0.65rem; color:#1E3050; margin-top:0.4rem; }
 .p-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(165px,1fr)); gap:0.7rem; margin:0.8rem 0 1.4rem; }
 .p-card { background:#0B1120; border:1px solid #131D2E; border-radius:3px; padding:0.85rem 1rem; }
-.p-sym  { font-family:'DM Mono',monospace; font-size:0.75rem; color:#C9A84C; margin-bottom:0.25rem; }
+.p-sym  { font-family:'Noto Sans','DM Mono',monospace; font-size:0.75rem; color:#C9A84C; margin-bottom:0.25rem; }
 .p-cnt  { font-family:'Syne',sans-serif; font-size:1.3rem; font-weight:700; color:#DCE0EA; }
 .p-lbl  { font-family:'DM Mono',monospace; font-size:0.6rem; color:#2E4060; text-transform:uppercase; letter-spacing:0.08em; }
 .p-ex   { font-family:'DM Mono',monospace; font-size:0.62rem; color:#1A2E46; margin-top:0.35rem; }
@@ -247,39 +260,343 @@ def speak_button(word: str, label: str = "", key: str = ""):
     components.html(html, height=40)
 
 
-# ── Morphological pattern classifier for irregular verbs ──────────────────────
+# ── Morphological pattern classifier ──────────────────────────────────────────
 MORPH_PATTERNS = {
     'Invariant':       ('b-t',   '#7DCBA8', 'base = past = PP',           'cut · put · hit · let · set · hurt · cost · burst'),
-    'Collapsed':       ('b-d',   '#5B9EC9', 'past = PP ≠ base',           'bring · buy · think · teach · catch · sell · tell · make'),
+    'Collapsed':       ('b-d',   '#5B9EC9', 'past = PP, base different',  'bring · buy · think · teach · catch · sell · tell · make'),
     'Tripartite':      ('b-irr', '#C97080', 'all three forms different',  'sing · drink · begin · swim · drive · write · choose'),
     '-en Participle':  ('b-inf', '#A090D8', 'PP ends in -en / -n',        'break · fall · give · take · see · know · grow · wear'),
-    'Dental Suffix':   ('b-id',  '#C9A84C', 'past/PP ends in -ght / dental','buy/bought · fight · seek · think · catch · teach'),
+    'Dental Suffix':   ('b-id',  '#C9A84C', 'past/PP ends in -ght / dental', 'buy/bought · fight · seek · think · catch · teach'),
 }
 
 def classify_morph_pattern(row):
     base = str(row.get('Base', '')).lower().strip()
     past = str(row.get('Simple_Past', '')).lower().strip()
     pp   = str(row.get('Past_Participle', '')).lower().strip()
-
-    # 1. Invariant — all three identical
     if base == past == pp:
         return 'Invariant'
-
-    # 2. Dental suffix — -ght, -pt, -lt, -ld, -nt endings on past or PP
     dental_endings = ('ght', 'pt', 'lt', 'ld', 'nt')
     if past.endswith(dental_endings) or pp.endswith(dental_endings):
         return 'Dental Suffix'
-
-    # 3. -en Participle — PP ends in -en or bare -n while past does not
     if (pp.endswith('en') or (pp.endswith('n') and not past.endswith('n'))) and past != pp:
         return '-en Participle'
-
-    # 4. Collapsed — past == PP but base is different
     if past == pp and base != past:
         return 'Collapsed'
-
-    # 5. Tripartite — all three genuinely different
     return 'Tripartite'
+
+
+# ── Vowel pattern info — PHASE 1 NEW ──────────────────────────────────────────
+# Each entry maps a Vowel_Change key to a rich explanation shown in the Lookup card.
+# Keys must match exactly the values in the dataset's Vowel_Change column.
+VOWEL_PATTERN_INFO = {
+    "iː → ɛ": {
+        "title": "Long EE  →  Short E",
+        "spelling": "ee / ea  →  e  (often drops a letter)",
+        "plain": (
+            "The long 'ee' sound (as in <i>feel</i>) shortens to a plain short 'e' "
+            "(as in <i>felt</i>). The spelling usually stays close but simplifies."
+        ),
+        "tip": "Verbs ending in -eel, -eep, -eal, -eet usually follow this rule.",
+        "color": "#5B9EC9",
+        "examples": [
+            ("feel","felt",""), ("keep","kept",""), ("sleep","slept",""),
+            ("meet","met",""), ("deal","dealt",""), ("dream","dreamt",""),
+        ],
+    },
+    "aɪ → oʊ": {
+        "title": "Long I  →  Long O",
+        "spelling": "i-e  →  o-e  (silent -e stays, vowel shifts)",
+        "plain": (
+            "The 'eye' sound (aɪ, as in <i>write</i>) shifts forward to an 'oh' sound "
+            "(oʊ, as in <i>wrote</i>). Very common in verbs ending in a silent -e."
+        ),
+        "tip": "If the base ends in -ive, -ide, -ite, -ise — check for this O-shift in the past.",
+        "color": "#C97080",
+        "examples": [
+            ("write","wrote",""), ("ride","rode",""), ("drive","drove",""),
+            ("rise","rose",""), ("strive","strove",""),
+        ],
+    },
+    "ɪ → æ → ʌ": {
+        "title": "Vowel Ladder  I → A → U",
+        "spelling": "i  →  a  →  u  (three steps, all different)",
+        "plain": (
+            "Each of the three forms uses a different vowel — the vowel 'descends' "
+            "in the mouth from front (i) to back (u). "
+            "These are the most recognizable irregular verbs in English."
+        ),
+        "tip": "Learn these as trios: sing/sang/sung. The pattern is very consistent across the group.",
+        "color": "#C97080",
+        "examples": [
+            ("sing","sang","sung"), ("drink","drank","drunk"),
+            ("ring","rang","rung"), ("swim","swam","swum"), ("begin","began","begun"),
+        ],
+    },
+    "no vowel change": {
+        "title": "Invariable  —  No Change",
+        "spelling": "base = past = past participle  (identical)",
+        "plain": (
+            "These verbs look exactly the same in all three forms. "
+            "Context is the only way to tell them apart. "
+            "Most are short, one-syllable verbs inherited from Old English."
+        ),
+        "tip": "cut, put, hit, let, set, hurt, cost, burst — all short, all unchanged.",
+        "color": "#7DCBA8",
+        "examples": [
+            ("cut","cut","cut"), ("put","put","put"), ("hit","hit","hit"),
+            ("let","let","let"), ("set","set","set"), ("hurt","hurt","hurt"),
+        ],
+    },
+    "eɪ → oʊ": {
+        "title": "Long A  →  Long O",
+        "spelling": "a-e / -eak / -ake  →  -oke / -ore",
+        "plain": (
+            "The 'ay' sound (eɪ, as in <i>speak</i>) shifts to an 'oh' sound "
+            "(oʊ, as in <i>spoke</i>). Common in verbs with -ake or -eak endings."
+        ),
+        "tip": "Break/broke, wake/woke, speak/spoke, steal/stole — the A-to-O shift is consistent.",
+        "color": "#C9A84C",
+        "examples": [
+            ("break","broke",""), ("wake","woke",""), ("speak","spoke",""),
+            ("steal","stole",""), ("choose","chose",""),
+        ],
+    },
+    "ɪ → ʌ": {
+        "title": "Short I  →  Short U",
+        "spelling": "i  →  u / o  (vowel gets 'deeper')",
+        "plain": (
+            "The short 'ih' sound (ɪ) moves back in the mouth to a short 'uh' "
+            "sound (ʌ). The consonants around the vowel usually stay the same."
+        ),
+        "tip": "Dig/dug, stick/stuck, win/won, hang/hung — the vowel deepens but the word shape holds.",
+        "color": "#A090D8",
+        "examples": [
+            ("dig","dug",""), ("stick","stuck",""), ("win","won",""),
+            ("hang","hung",""), ("sink","sank","sunk"),
+        ],
+    },
+    "aɪ → ɪ": {
+        "title": "Long I  →  Short I",
+        "spelling": "i-e  →  i  (silent -e drops off)",
+        "plain": (
+            "The long 'eye' sound (aɪ) shortens to a plain short 'i' (ɪ). "
+            "The spelling drops the silent -e that was making the vowel long."
+        ),
+        "tip": "Bite/bit, hide/hid, slide/slid, light/lit — the silent -e disappears and the vowel shortens.",
+        "color": "#C97080",
+        "examples": [
+            ("bite","bit",""), ("hide","hid",""), ("slide","slid",""),
+            ("light","lit",""), ("shine","shone",""),
+        ],
+    },
+    "ʌ → eɪ → ʌ": {
+        "title": "U → A → U  (Comeback Pattern)",
+        "spelling": "o  →  a-e  →  o  (past is the odd one out)",
+        "plain": (
+            "Unusual structure: the past tense changes, but the past participle "
+            "<i>returns</i> to the same form as the base. Only a handful of verbs work this way."
+        ),
+        "tip": "Come/came/come, become/became/become, run/ran/run — memorize these as a small group.",
+        "color": "#A090D8",
+        "examples": [
+            ("come","came","come"), ("become","became","become"), ("run","ran","run"),
+        ],
+    },
+    "iː → ɔː": {
+        "title": "Long EE  →  AW Sound",
+        "spelling": "ee / e  →  aw / -ought / -aught",
+        "plain": (
+            "The 'ee' sound (iː) transforms into a broad 'aw' sound (ɔː). "
+            "This often involves a major spelling change — the -ght spelling is the visual signal."
+        ),
+        "tip": "If the past ends in -ought or -aught, the base almost certainly had a long vowel.",
+        "color": "#5B9EC9",
+        "examples": [
+            ("see","saw",""), ("seek","sought",""), ("teach","taught",""),
+            ("catch","caught",""), ("think","thought",""),
+        ],
+    },
+    "aɪ → aʊ": {
+        "title": "Long I  →  OW Sound",
+        "spelling": "-ind / -ine  →  -ound / -ound",
+        "plain": (
+            "The 'eye' sound (aɪ) shifts to an 'ow' sound (aʊ, as in <i>cow</i>). "
+            "Most of these verbs end in -ind or -ine in the base form."
+        ),
+        "tip": "Find/found, bind/bound, wind/wound, grind/ground — the -nd ending is the trigger.",
+        "color": "#C9A84C",
+        "examples": [
+            ("find","found",""), ("bind","bound",""), ("wind","wound",""),
+            ("grind","ground",""),
+        ],
+    },
+    "aɪ → ɔː": {
+        "title": "Long I  →  AW / -ought",
+        "spelling": "-uy / -ight / -ight  →  -ought / -aught",
+        "plain": (
+            "The 'eye' sound (aɪ) becomes the broad 'aw' sound (ɔː), "
+            "almost always written as <b>-ought</b> or <b>-aught</b>. "
+            "This group includes some of the most frequent verbs in English."
+        ),
+        "tip": "The -ought / -aught ending is one of the most reliable spelling signals in English irregular verbs.",
+        "color": "#C97080",
+        "examples": [
+            ("buy","bought",""), ("fight","fought",""), ("catch","caught",""),
+            ("teach","taught",""), ("bring","brought",""),
+        ],
+    },
+    "oʊ → uː": {
+        "title": "Long O  →  OO Sound",
+        "spelling": "-ow / -y  →  -ew  (long O becomes long OO)",
+        "plain": (
+            "The 'oh' sound (oʊ) moves forward in the mouth to a long 'oo' sound (uː). "
+            "The spelling almost always changes to <b>-ew</b> in the past tense."
+        ),
+        "tip": "Know/knew, grow/grew, throw/threw, blow/blew, fly/flew — the -ew ending is the giveaway.",
+        "color": "#7DCBA8",
+        "examples": [
+            ("know","knew",""), ("grow","grew",""), ("throw","threw",""),
+            ("blow","blew",""), ("fly","flew",""),
+        ],
+    },
+}
+
+
+def render_pattern_card(vowel_change: str) -> str:
+    """
+    Returns an HTML string with a visual sound-shift diagram and explanation
+    for a given Vowel_Change value. Uses Noto Sans for all IPA characters.
+    Returns empty string if the pattern is not in VOWEL_PATTERN_INFO.
+    """
+    info = VOWEL_PATTERN_INFO.get(vowel_change)
+    if not info:
+        # Fallback: show a minimal card with just the symbol if we have no detail
+        return f"""
+        <div style="background:#070E1A;border:1px solid #131D2E;border-left:2px solid #2E4060;
+                    border-radius:3px;padding:0.9rem 1.2rem;margin-top:0.7rem;">
+          <div style="font-family:'DM Mono',monospace;font-size:0.58rem;letter-spacing:0.16em;
+                      text-transform:uppercase;color:#1A2E46;margin-bottom:0.4rem;">Sound Pattern</div>
+          <div style="font-family:'Noto Sans','Segoe UI',sans-serif;font-size:1.1rem;
+                      color:#5B9EC9;">{vowel_change}</div>
+        </div>
+        """
+
+    color    = info['color']
+    title    = info['title']
+    spelling = info['spelling']
+    plain    = info['plain']
+    tip      = info['tip']
+    examples = info['examples']
+
+    # ── Build phonetic arrow diagram ─────────────────────────────────────
+    # Split on → to get the IPA symbols for each form
+    parts  = [p.strip() for p in vowel_change.split('\u2192')]
+    labels = ['base form', 'simple past', 'past part.'][:len(parts)]
+
+    boxes = []
+    for i, (sym, lbl) in enumerate(zip(parts, labels)):
+        sym_color = '#DCE0EA' if i == 0 else color
+        boxes.append(f"""
+        <div style="text-align:center;min-width:60px;">
+          <div style="font-family:'Noto Sans','Segoe UI',Arial,sans-serif;
+                      font-size:1.75rem;font-weight:600;
+                      color:{sym_color};line-height:1.1;">{sym}</div>
+          <div style="font-family:'DM Mono',monospace;font-size:0.52rem;
+                      color:#1A2E46;text-transform:uppercase;
+                      letter-spacing:0.1em;margin-top:0.3rem;">{lbl}</div>
+        </div>""")
+
+    arrow_sep = (
+        '<div style="font-family:\\'Noto Sans\\',sans-serif;font-size:1.2rem;'
+        'color:#1A2E46;padding:0 0.4rem;align-self:flex-start;'
+        'padding-top:0.35rem;">\u2192</div>'
+    )
+    arrow_row = arrow_sep.join(boxes)
+
+    # ── Build example pairs/trios ────────────────────────────────────────
+    ex_parts = []
+    for ex in examples:
+        base_w = ex[0]
+        # Filter out empty strings
+        forms = [f for f in ex if f]
+        if len(forms) == 2:
+            ex_parts.append(
+                f'<span style="color:#8096B8;font-size:0.72rem;">{forms[0]}</span>'
+                f'<span style="color:#1A2E46;font-size:0.65rem;"> / </span>'
+                f'<span style="color:{color};font-size:0.72rem;">{forms[1]}</span>'
+            )
+        elif len(forms) == 3:
+            ex_parts.append(
+                f'<span style="color:#8096B8;font-size:0.72rem;">{forms[0]}</span>'
+                f'<span style="color:#1A2E46;font-size:0.65rem;"> / </span>'
+                f'<span style="color:{color};font-size:0.72rem;">{forms[1]}</span>'
+                f'<span style="color:#1A2E46;font-size:0.65rem;"> / </span>'
+                f'<span style="color:{color};font-size:0.72rem;">{forms[2]}</span>'
+            )
+
+    ex_html = (
+        '<div style="display:flex;flex-wrap:wrap;gap:0.8rem 1.4rem;'
+        'font-family:\'DM Mono\',monospace;margin-top:0.15rem;">'
+        + ''.join(ex_parts)
+        + '</div>'
+    )
+
+    return f"""
+    <div style="background:#070E1A;border:1px solid {color}33;
+                border-left:2px solid {color};border-radius:3px;
+                padding:1.1rem 1.3rem;margin-top:0.75rem;">
+
+      <div style="font-family:'DM Mono',monospace;font-size:0.54rem;
+                  letter-spacing:0.2em;text-transform:uppercase;
+                  color:#1A2E46;margin-bottom:0.55rem;">
+        Sound Pattern
+      </div>
+
+      <div style="font-family:'Syne',sans-serif;font-size:0.88rem;
+                  font-weight:700;color:#DCE0EA;margin-bottom:0.85rem;">
+        {title}
+      </div>
+
+      <!-- Phonetic arrow diagram -->
+      <div style="display:flex;align-items:flex-start;gap:0.1rem;
+                  margin-bottom:0.9rem;flex-wrap:wrap;">
+        {arrow_row}
+      </div>
+
+      <!-- Spelling pattern -->
+      <div style="font-family:'DM Mono',monospace;font-size:0.63rem;
+                  color:#2E4060;margin-bottom:0.65rem;
+                  padding:0.35rem 0.65rem;background:#060A10;
+                  border-radius:2px;border:1px solid #0F1A28;
+                  display:inline-block;">
+        Spelling &nbsp; {spelling}
+      </div>
+
+      <!-- Plain explanation -->
+      <div style="font-family:'DM Mono',monospace;font-size:0.72rem;
+                  color:#3A5070;line-height:1.9;margin-bottom:0.8rem;">
+        {plain}
+      </div>
+
+      <!-- Examples -->
+      <div style="font-family:'DM Mono',monospace;font-size:0.6rem;
+                  color:#1A2E46;letter-spacing:0.1em;text-transform:uppercase;
+                  margin-bottom:0.35rem;">
+        Examples in this group
+      </div>
+      {ex_html}
+
+      <!-- Memory tip -->
+      <div style="font-family:'DM Mono',monospace;font-size:0.63rem;
+                  color:#1E3050;border-top:1px solid #0F1A28;
+                  padding-top:0.6rem;margin-top:0.8rem;line-height:1.8;
+                  letter-spacing:0.02em;">
+        <span style="color:#2E4060;letter-spacing:0.1em;font-size:0.56rem;
+                     text-transform:uppercase;">Memory tip</span><br>
+        {tip}
+      </div>
+    </div>
+    """
 
 
 # ── Data & model ───────────────────────────────────────────────────────────────
@@ -311,8 +628,6 @@ def load_data():
 
     df_reg['Type']   = 'Regular'
     df_irreg['Type'] = 'Irregular'
-
-    # ── PATCH: classify each irregular verb by morphological pattern ──────
     df_irreg['Morph_Pattern'] = df_irreg.apply(classify_morph_pattern, axis=1)
 
     return df_reg, df_irreg, df_part
@@ -470,7 +785,6 @@ if page == "/ Lookup":
         row, verb_type, matched_form = find_verb(verb_input, df_reg, df_irreg, df_part)
 
         if row is not None and verb_type == 'Participial Adjective':
-            # ── Participial Adjective result ──────────────────────────────
             sc   = row['Semantic_Class']
             bc   = SC_BADGE.get(sc, 'b-part')
             info = get_semantic_class_info(sc)
@@ -506,7 +820,7 @@ if page == "/ Lookup":
                 <div style="font-family:'DM Mono',monospace;font-size:0.58rem;letter-spacing:0.14em;
                             text-transform:uppercase;color:#1E3050;margin-bottom:0.35rem;">Participial Adjective</div>
                 <span class="ipa">{row['IPA_Adj']}</span>
-                <div style="font-family:'DM Mono',monospace;font-size:0.68rem;
+                <div style="font-family:'Noto Sans','DM Mono',monospace;font-size:0.68rem;
                             color:#2E4060;margin-top:0.35rem;">{row['Phonetic_Adj']}</div>
               </div>
             </div>
@@ -541,19 +855,18 @@ if page == "/ Lookup":
               <div style="font-family:'DM Mono',monospace;font-size:0.76rem;color:#4A6280;line-height:2.2;">
                 <span style="color:#2E4060;">Very test:&nbsp;</span>
                 <span style="color:#DCE0EA;">"very {row['Participial_Form']}"</span>
-                &nbsp;→ if natural, it's an adjective<br>
+                &nbsp;— if natural, it's an adjective<br>
                 <span style="color:#2E4060;">Seem test:&nbsp;</span>
                 <span style="color:#DCE0EA;">"seem {row['Participial_Form']}"</span>
-                &nbsp;→ predicative adjective test<br>
+                &nbsp;— predicative adjective test<br>
                 <span style="color:#2E4060;">Attributive:&nbsp;</span>
                 <span style="color:#DCE0EA;">a {row['Participial_Form']} [noun]</span>
-                &nbsp;→ adjective before noun<br>
+                &nbsp;— adjective before noun<br>
               </div>
             </div>
             """, unsafe_allow_html=True)
 
         elif row is not None:
-            # ── Regular or Irregular result ───────────────────────────────
             badge_cls = 'b-reg' if verb_type == 'Regular' else 'b-irr'
             st.markdown(f"""
             <div class="found-in">
@@ -584,27 +897,29 @@ if page == "/ Lookup":
                 <div style="font-family:'DM Mono',monospace;font-size:0.58rem;letter-spacing:0.14em;
                             text-transform:uppercase;color:#1E3050;margin-bottom:0.35rem;">Base</div>
                 <span class="ipa">{row['IPA_Base']}</span>
-                <div style="font-family:'DM Mono',monospace;font-size:0.68rem;
+                <div style="font-family:'Noto Sans','DM Mono',monospace;font-size:0.68rem;
                             color:#2E4060;margin-top:0.35rem;">{row['Phonetic_Base']}</div>
               </div>
               <div class="card-sm" style="flex:1;min-width:140px;">
                 <div style="font-family:'DM Mono',monospace;font-size:0.58rem;letter-spacing:0.14em;
                             text-transform:uppercase;color:#1E3050;margin-bottom:0.35rem;">Simple Past</div>
                 <span class="ipa">{row['IPA_Past']}</span>
-                <div style="font-family:'DM Mono',monospace;font-size:0.68rem;
+                <div style="font-family:'Noto Sans','DM Mono',monospace;font-size:0.68rem;
                             color:#2E4060;margin-top:0.35rem;">{row['Phonetic_Past']}</div>
               </div>
               <div class="card-sm" style="flex:1;min-width:140px;">
                 <div style="font-family:'DM Mono',monospace;font-size:0.58rem;letter-spacing:0.14em;
                             text-transform:uppercase;color:#1E3050;margin-bottom:0.35rem;">Past Participle</div>
                 <span class="ipa">{row['IPA_PP']}</span>
-                <div style="font-family:'DM Mono',monospace;font-size:0.68rem;
+                <div style="font-family:'Noto Sans','DM Mono',monospace;font-size:0.68rem;
                             color:#2E4060;margin-top:0.35rem;">{row['Phonetic_PP']}</div>
               </div>
             </div>
             """, unsafe_allow_html=True)
 
+            # ── Phonetic Rule ─────────────────────────────────────────────
             st.markdown('<span class="sec-label">Phonetic Rule</span>', unsafe_allow_html=True)
+
             if verb_type == 'Regular':
                 ending = row['Ending']
                 sound  = row['Last_Sound']
@@ -618,7 +933,7 @@ if page == "/ Lookup":
                 st.markdown(f"""
                 <div class="card">
                   <span class="badge {bc}">{ending}</span>
-                  <span style="font-family:'DM Mono',monospace;font-size:0.65rem;color:#1E3050;">
+                  <span style="font-family:'Noto Sans','DM Mono',monospace;font-size:0.65rem;color:#1E3050;">
                     last sound: {sound}
                   </span>
                   <div style="font-family:'DM Mono',monospace;font-size:0.78rem;
@@ -627,7 +942,9 @@ if page == "/ Lookup":
                   </div>
                 </div>
                 """, unsafe_allow_html=True)
+
             else:
+                # ── IRREGULAR VERB — main rule card ──────────────────────
                 vc  = row['Vowel_Change']
                 mp  = row.get('Morph_Pattern', '')
                 mp_info = MORPH_PATTERNS.get(mp, ('b-irr', C2, '', ''))
@@ -637,9 +954,7 @@ if page == "/ Lookup":
                     (df_irreg['Vowel_Change'] == vc) & (df_irreg['Base'] != row['Base'])
                 ]['Base'].tolist()[:7]
                 sib_str = " &nbsp;&middot;&nbsp; ".join(siblings) if siblings else "—"
-                ex = PATTERN_EXAMPLES.get(vc, "")
 
-                # Morphological pattern siblings
                 mp_siblings = df_irreg[
                     (df_irreg['Morph_Pattern'] == mp) & (df_irreg['Base'] != row['Base'])
                 ]['Base'].tolist()[:6]
@@ -647,39 +962,44 @@ if page == "/ Lookup":
 
                 st.markdown(f"""
                 <div class="card">
-                  <div style="margin-bottom:0.6rem;">
+                  <div style="margin-bottom:0.65rem;">
                     <span class="badge b-irr">{vc}</span>
-                    <span style="font-family:'DM Mono',monospace;font-size:0.65rem;color:#1E3050;">
+                    <span style="font-family:'DM Mono',monospace;font-size:0.63rem;color:#1E3050;">
                       vowel change pattern
                     </span>
                   </div>
-                  <div style="font-family:'DM Mono',monospace;font-size:0.78rem;
-                              color:#4A6280;line-height:1.85;">
-                    This verb does <b>not</b> follow the -ed rule.<br>
+                  <div style="font-family:'DM Mono',monospace;font-size:0.77rem;
+                              color:#4A6280;line-height:1.9;">
+                    This verb does <b>not</b> follow the -ed rule.
                     It changes its internal vowel to form the past tense.
-                    {f'<br><span style="color:#1E3050;">Examples: {ex}</span>' if ex else ''}
                   </div>
-                  <div style="font-family:'DM Mono',monospace;font-size:0.65rem;
-                              color:#1A2E46;margin-top:0.8rem;">
+                  <div style="font-family:'DM Mono',monospace;font-size:0.64rem;
+                              color:#1A2E46;margin-top:0.75rem;">
                     Same vowel pattern: {sib_str}
                   </div>
                   <div style="border-top:1px solid #131D2E;margin-top:0.9rem;padding-top:0.9rem;">
                     <span class="badge {mp_bc}">{mp}</span>
-                    <span style="font-family:'DM Mono',monospace;font-size:0.65rem;color:#1E3050;">
-                      morphological pattern &nbsp;·&nbsp; {mp_desc}
+                    <span style="font-family:'DM Mono',monospace;font-size:0.63rem;color:#1E3050;">
+                      morphological group &nbsp;·&nbsp; {mp_desc}
                     </span>
-                    <div style="font-family:'DM Mono',monospace;font-size:0.65rem;
-                                color:#1A2E46;margin-top:0.55rem;">
+                    <div style="font-family:'DM Mono',monospace;font-size:0.63rem;
+                                color:#1A2E46;margin-top:0.5rem;">
                       Same structure: {mp_sib_str}
                     </div>
                   </div>
                 </div>
                 """, unsafe_allow_html=True)
 
-            # Check if this verb also has a participial adjective entry
+                # ── PHASE 1 NEW: Pattern explanation card ─────────────────
+                st.markdown(
+                    render_pattern_card(vc),
+                    unsafe_allow_html=True
+                )
+
+            # ── Participial adjective cross-link ──────────────────────────
             part_match = df_part[df_part['Base_Verb'].str.lower() == row['Base'].lower()]
             if not part_match.empty:
-                pm = part_match.iloc[0]
+                pm  = part_match.iloc[0]
                 bc2 = SC_BADGE.get(pm['Semantic_Class'], 'b-part')
                 st.markdown(f"""
                 <div class="card" style="border-color:#1A2E46;">
@@ -799,7 +1119,7 @@ elif page == "/ Phonetic Explorer":
             <div class="stat-num" style="color:{C3};">{i}</div>
             <div style="margin:0.3rem 0;"><span class="badge b-id">/ɪd/</span></div>
             <div class="stat-lbl">T or D ending</div>
-            <div class="stat-sub">/t/ or /d/ → needs extra syllable</div>
+            <div class="stat-sub">/t/ or /d/ — needs extra syllable</div>
           </div>
         </div>
         """, unsafe_allow_html=True)
@@ -827,7 +1147,6 @@ elif page == "/ Phonetic Explorer":
 
         sub_vowel, sub_morph = st.tabs(["By Vowel Change", "By Morphological Pattern"])
 
-        # ── Vowel change sub-tab (original content) ────────────────────────
         with sub_vowel:
             vc_counts = df_irreg['Vowel_Change'].value_counts()
             cards = '<div class="p-grid">'
@@ -854,19 +1173,19 @@ elif page == "/ Phonetic Explorer":
                 <div style="font-family:'DM Mono',monospace;font-size:0.7rem;
                             color:#1E3050;margin-bottom:0.6rem;">{PATTERN_EXAMPLES[sel]}</div>
                 """, unsafe_allow_html=True)
+            if sel != "All patterns":
+                st.markdown(render_pattern_card(sel), unsafe_allow_html=True)
 
             st.markdown(f'<span class="sec-label">{len(df_sh)} verbs</span>', unsafe_allow_html=True)
             st.dataframe(
                 df_sh[['Base','Simple_Past','Past_Participle','IPA_Base','IPA_Past','Vowel_Change']
                       ].reset_index(drop=True),
-                use_container_width=True, height=360
+                use_container_width=True, height=340
             )
 
-        # ── NEW: Morphological pattern sub-tab ────────────────────────────
         with sub_morph:
             mp_counts = df_irreg['Morph_Pattern'].value_counts()
 
-            # Summary cards
             cards2 = '<div class="p-grid">'
             for pat, cnt in mp_counts.items():
                 bc, color, desc, exs = MORPH_PATTERNS.get(pat, ('b-reg', C4, '', ''))
@@ -884,7 +1203,6 @@ elif page == "/ Phonetic Explorer":
             cards2 += '</div>'
             st.markdown(cards2, unsafe_allow_html=True)
 
-            # Expanded explanation for each pattern
             st.markdown('<span class="sec-label">Pattern Definitions</span>', unsafe_allow_html=True)
             for pat, (bc, color, desc, exs) in MORPH_PATTERNS.items():
                 count = mp_counts.get(pat, 0)
@@ -902,13 +1220,10 @@ elif page == "/ Phonetic Explorer":
                     </span>
                   </div>
                   <div style="font-family:'DM Mono',monospace;font-size:0.7rem;
-                              color:#2E4060;line-height:2.1;">
-                    {exs}
-                  </div>
+                              color:#2E4060;line-height:2.1;">{exs}</div>
                 </div>
                 """, unsafe_allow_html=True)
 
-            # Filter + table
             st.markdown('<span class="sec-label">Filter by Morphological Pattern</span>',
                         unsafe_allow_html=True)
             mp_opts = ["All patterns"] + mp_counts.index.tolist()
@@ -1040,11 +1355,9 @@ elif page == "/ Charts":
     with t1:
         fig, axes = plt.subplots(1, 2, figsize=(11, 4))
         for ax in axes: sax(ax, fig)
-
         cats   = ['Regular', 'Irregular', 'Participial\nAdj']
         vals   = [len(df_reg), len(df_irreg), len(df_part)]
         colors = [C1, C2, C5]
-
         axes[0].bar(cats, vals, color=colors, width=0.42, edgecolor=BG, linewidth=2.5)
         for i, (cat, val) in enumerate(zip(cats, vals)):
             axes[0].text(i, val + 1.5, str(val), ha='center',
@@ -1053,14 +1366,12 @@ elif page == "/ Charts":
         axes[0].set_ylim(0, max(vals) * 1.2)
         for sp in axes[0].spines.values(): sp.set_visible(False)
         axes[0].tick_params(bottom=False)
-
         axes[1].pie(vals,
                     labels=[f'{c.replace(chr(10), " ")}  ({v})' for c, v in zip(cats, vals)],
                     colors=colors, autopct='%1.0f%%', startangle=90,
                     wedgeprops={'edgecolor': BG, 'linewidth': 3},
                     textprops={'color': CT, 'fontsize': 8.5, 'fontfamily': 'monospace'})
         axes[1].set_title('Dataset Share', fontsize=10, pad=10)
-
         plt.tight_layout()
         st.pyplot(fig)
         st.markdown(f'<div style="font-family:\'DM Mono\',monospace;font-size:0.72rem;color:#1E3050;margin-top:0.4rem;">The 10 most frequent English verbs are all irregular. Of {len(df_part)} participial adjectives, {len(df_part[df_part["Semantic_Class"]=="Emotional state"])} describe emotional states — the largest class.</div>', unsafe_allow_html=True)
@@ -1104,14 +1415,11 @@ elif page == "/ Charts":
         plt.tight_layout()
         st.pyplot(fig)
 
-    # ── NEW: Morphological groups chart ───────────────────────────────────
     with t4:
         mp_counts = df_irreg['Morph_Pattern'].value_counts()
         mp_colors = [MORPH_PATTERNS.get(k, ('b-reg', C1, '', ''))[1] for k in mp_counts.index]
-
         fig, axes = plt.subplots(1, 2, figsize=(11, 4.5))
         for ax in axes: sax(ax, fig)
-
         axes[0].bar(range(len(mp_counts)), mp_counts.values,
                     color=mp_colors, edgecolor=BG, linewidth=2, width=0.45)
         for i, val in enumerate(mp_counts.values):
@@ -1126,7 +1434,6 @@ elif page == "/ Charts":
         axes[0].set_ylim(0, mp_counts.max() * 1.25)
         for sp in axes[0].spines.values(): sp.set_visible(False)
         axes[0].tick_params(bottom=False)
-
         wedges, texts, autotexts = axes[1].pie(
             mp_counts.values,
             labels=[f'{k}  ({v})' for k, v in mp_counts.items()],
@@ -1140,20 +1447,12 @@ elif page == "/ Charts":
         axes[1].text(0, 0, f'{len(df_irreg)}\nirregular', ha='center', va='center',
                      fontsize=10, fontweight='bold', color='#DCE0EA', fontfamily='monospace')
         axes[1].set_title('Morphological Pattern Distribution', fontsize=10, pad=10)
-
         plt.tight_layout()
         st.pyplot(fig)
-
-        st.markdown('<span class="sec-label">Cross-tabulation: Pattern × Vowel Change</span>',
+        st.markdown('<span class="sec-label">Cross-tabulation: Pattern x Vowel Change</span>',
                     unsafe_allow_html=True)
         cross = pd.crosstab(df_irreg['Morph_Pattern'], df_irreg['Vowel_Change'])
         st.dataframe(cross, use_container_width=True, height=260)
-        st.markdown("""
-        <div style="font-family:'DM Mono',monospace;font-size:0.72rem;color:#1E3050;margin-top:0.4rem;line-height:2;">
-          Each cell = number of verbs sharing both a morphological pattern and a vowel change pattern.<br>
-          Tripartite verbs span the most vowel patterns — they are the most phonetically diverse group.
-        </div>
-        """, unsafe_allow_html=True)
 
     with t5:
         df_reg['len']   = df_reg['Base'].str.len()
@@ -1179,10 +1478,8 @@ elif page == "/ Charts":
     with t6:
         sc_counts = df_part['Semantic_Class'].value_counts()
         sc_colors = [SC_COLOR.get(k, C5) for k in sc_counts.index]
-
         fig, axes = plt.subplots(1, 2, figsize=(11, 4.5))
         for ax in axes: sax(ax, fig)
-
         axes[0].bar(range(len(sc_counts)), sc_counts.values,
                     color=sc_colors, edgecolor=BG, linewidth=2, width=0.45)
         for i, val in enumerate(sc_counts.values):
@@ -1197,7 +1494,6 @@ elif page == "/ Charts":
         axes[0].set_ylim(0, sc_counts.max() * 1.25)
         for sp in axes[0].spines.values(): sp.set_visible(False)
         axes[0].tick_params(bottom=False)
-
         wedges, texts, autotexts = axes[1].pie(
             sc_counts.values,
             labels=[f'{k}  ({v})' for k, v in sc_counts.items()],
@@ -1211,20 +1507,15 @@ elif page == "/ Charts":
         axes[1].text(0, 0, f'{len(df_part)}\nadj', ha='center', va='center',
                      fontsize=11, fontweight='bold', color='#DCE0EA', fontfamily='monospace')
         axes[1].set_title('Participial Adj Distribution', fontsize=10, pad=10)
-
         plt.tight_layout()
         st.pyplot(fig)
-
-        st.markdown('<span class="sec-label">Verb–Adjective Overlap</span>', unsafe_allow_html=True)
-
+        st.markdown('<span class="sec-label">Verb-Adjective Overlap</span>', unsafe_allow_html=True)
         part_bases = set(df_part['Base_Verb'].str.lower())
         reg_bases  = set(df_reg['Base'].str.lower())
         irr_bases  = set(df_irreg['Base'].str.lower())
-
         overlap_reg  = part_bases & reg_bases
         overlap_irr  = part_bases & irr_bases
         only_part    = part_bases - reg_bases - irr_bases
-
         fig2, ax2 = plt.subplots(figsize=(8, 3.5))
         sax(ax2, fig2)
         bars = ax2.barh(
@@ -1245,10 +1536,9 @@ elif page == "/ Charts":
         )
         plt.tight_layout()
         st.pyplot(fig2)
-
         st.markdown(f"""
         <div style="font-family:'DM Mono',monospace;font-size:0.72rem;color:#1E3050;margin-top:0.4rem;line-height:2;">
-          <span style="color:{C1};">{len(overlap_reg)}</span> participial adjectives derive from regular verbs
+          <span style="color:{C1};">{len(overlap_reg)}</span> from regular verbs
           &nbsp;·&nbsp;
           <span style="color:{C2};">{len(overlap_irr)}</span> from irregular verbs (broken, frozen, worn...)
           &nbsp;·&nbsp;
@@ -1303,7 +1593,7 @@ elif page == "/ Model Performance":
     st.markdown(f"""
     <div style="font-family:'DM Mono',monospace;font-size:0.72rem;color:#2E4060;margin-top:0.8rem;">
       Mean: <span style="color:{C4};font-weight:600;">{cv_mean:.1%}</span>
-      &nbsp;&nbsp;±&nbsp;&nbsp;
+      &nbsp;&nbsp;+/-&nbsp;&nbsp;
       <span style="color:#1E3050;">{cv_std:.2%}</span> std
       &nbsp;&nbsp;·&nbsp;&nbsp; Stable model: low variance across folds.
     </div>
@@ -1336,17 +1626,17 @@ elif page == "/ Model Performance":
         <div style="font-family:'DM Mono',monospace;font-size:0.72rem;line-height:2.2;margin-top:0.5rem;">
           <div style="color:#1E3050;text-transform:uppercase;letter-spacing:0.1em;
                       font-size:0.6rem;margin-bottom:0.5rem;">Reading the matrix</div>
-          <span style="color:{C4};">&#10003;</span>&nbsp;
+          <span style="color:{C4};">OK</span>&nbsp;
           <span style="color:#2E4060;">True Regular:&nbsp;</span>
           <span style="color:#DCE0EA;">{tn}</span><br>
-          <span style="color:{C4};">&#10003;</span>&nbsp;
+          <span style="color:{C4};">OK</span>&nbsp;
           <span style="color:#2E4060;">True Irregular:&nbsp;</span>
           <span style="color:#DCE0EA;">{tp}</span><br>
-          <span style="color:{C2};">&#10007;</span>&nbsp;
+          <span style="color:{C2};">X</span>&nbsp;
           <span style="color:#2E4060;">False Positives:&nbsp;</span>
           <span style="color:#DCE0EA;">{fp}</span>
           <span style="font-size:0.62rem;color:#1A2E46;"> (said Irreg, was Reg)</span><br>
-          <span style="color:{C2};">&#10007;</span>&nbsp;
+          <span style="color:{C2};">X</span>&nbsp;
           <span style="color:#2E4060;">False Negatives:&nbsp;</span>
           <span style="color:#DCE0EA;">{fn}</span>
           <span style="font-size:0.62rem;color:#1A2E46;"> (said Reg, was Irreg)</span><br><br>
@@ -1396,7 +1686,6 @@ elif page == "/ Model Performance":
     </div>
     """, unsafe_allow_html=True)
 
-    # ── Misclassification Analysis ─────────────────────────────────────────
     st.markdown('<span class="sec-label">Misclassification Analysis</span>', unsafe_allow_html=True)
 
     df_all_for_analysis = pd.concat([df_reg, df_irreg], ignore_index=True)
