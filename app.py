@@ -247,6 +247,41 @@ def speak_button(word: str, label: str = "", key: str = ""):
     components.html(html, height=40)
 
 
+# ── Morphological pattern classifier for irregular verbs ──────────────────────
+MORPH_PATTERNS = {
+    'Invariant':       ('b-t',   '#7DCBA8', 'base = past = PP',           'cut · put · hit · let · set · hurt · cost · burst'),
+    'Collapsed':       ('b-d',   '#5B9EC9', 'past = PP ≠ base',           'bring · buy · think · teach · catch · sell · tell · make'),
+    'Tripartite':      ('b-irr', '#C97080', 'all three forms different',  'sing · drink · begin · swim · drive · write · choose'),
+    '-en Participle':  ('b-inf', '#A090D8', 'PP ends in -en / -n',        'break · fall · give · take · see · know · grow · wear'),
+    'Dental Suffix':   ('b-id',  '#C9A84C', 'past/PP ends in -ght / dental','buy/bought · fight · seek · think · catch · teach'),
+}
+
+def classify_morph_pattern(row):
+    base = str(row.get('Base', '')).lower().strip()
+    past = str(row.get('Simple_Past', '')).lower().strip()
+    pp   = str(row.get('Past_Participle', '')).lower().strip()
+
+    # 1. Invariant — all three identical
+    if base == past == pp:
+        return 'Invariant'
+
+    # 2. Dental suffix — -ght, -pt, -lt, -ld, -nt endings on past or PP
+    dental_endings = ('ght', 'pt', 'lt', 'ld', 'nt')
+    if past.endswith(dental_endings) or pp.endswith(dental_endings):
+        return 'Dental Suffix'
+
+    # 3. -en Participle — PP ends in -en or bare -n while past does not
+    if (pp.endswith('en') or (pp.endswith('n') and not past.endswith('n'))) and past != pp:
+        return '-en Participle'
+
+    # 4. Collapsed — past == PP but base is different
+    if past == pp and base != past:
+        return 'Collapsed'
+
+    # 5. Tripartite — all three genuinely different
+    return 'Tripartite'
+
+
 # ── Data & model ───────────────────────────────────────────────────────────────
 @st.cache_data
 def load_data():
@@ -276,6 +311,10 @@ def load_data():
 
     df_reg['Type']   = 'Regular'
     df_irreg['Type'] = 'Irregular'
+
+    # ── PATCH: classify each irregular verb by morphological pattern ──────
+    df_irreg['Morph_Pattern'] = df_irreg.apply(classify_morph_pattern, axis=1)
+
     return df_reg, df_irreg, df_part
 
 
@@ -589,24 +628,50 @@ if page == "/ Lookup":
                 </div>
                 """, unsafe_allow_html=True)
             else:
-                vc = row['Vowel_Change']
+                vc  = row['Vowel_Change']
+                mp  = row.get('Morph_Pattern', '')
+                mp_info = MORPH_PATTERNS.get(mp, ('b-irr', C2, '', ''))
+                mp_bc, mp_color, mp_desc, mp_ex = mp_info
+
                 siblings = df_irreg[
                     (df_irreg['Vowel_Change'] == vc) & (df_irreg['Base'] != row['Base'])
                 ]['Base'].tolist()[:7]
                 sib_str = " &nbsp;&middot;&nbsp; ".join(siblings) if siblings else "—"
                 ex = PATTERN_EXAMPLES.get(vc, "")
+
+                # Morphological pattern siblings
+                mp_siblings = df_irreg[
+                    (df_irreg['Morph_Pattern'] == mp) & (df_irreg['Base'] != row['Base'])
+                ]['Base'].tolist()[:6]
+                mp_sib_str = " &nbsp;&middot;&nbsp; ".join(mp_siblings) if mp_siblings else "—"
+
                 st.markdown(f"""
                 <div class="card">
-                  <span class="badge b-irr">{vc}</span>
+                  <div style="margin-bottom:0.6rem;">
+                    <span class="badge b-irr">{vc}</span>
+                    <span style="font-family:'DM Mono',monospace;font-size:0.65rem;color:#1E3050;">
+                      vowel change pattern
+                    </span>
+                  </div>
                   <div style="font-family:'DM Mono',monospace;font-size:0.78rem;
-                              color:#4A6280;margin-top:0.75rem;line-height:1.85;">
+                              color:#4A6280;line-height:1.85;">
                     This verb does <b>not</b> follow the -ed rule.<br>
                     It changes its internal vowel to form the past tense.
                     {f'<br><span style="color:#1E3050;">Examples: {ex}</span>' if ex else ''}
                   </div>
                   <div style="font-family:'DM Mono',monospace;font-size:0.65rem;
                               color:#1A2E46;margin-top:0.8rem;">
-                    Same pattern: {sib_str}
+                    Same vowel pattern: {sib_str}
+                  </div>
+                  <div style="border-top:1px solid #131D2E;margin-top:0.9rem;padding-top:0.9rem;">
+                    <span class="badge {mp_bc}">{mp}</span>
+                    <span style="font-family:'DM Mono',monospace;font-size:0.65rem;color:#1E3050;">
+                      morphological pattern &nbsp;·&nbsp; {mp_desc}
+                    </span>
+                    <div style="font-family:'DM Mono',monospace;font-size:0.65rem;
+                                color:#1A2E46;margin-top:0.55rem;">
+                      Same structure: {mp_sib_str}
+                    </div>
                   </div>
                 </div>
                 """, unsafe_allow_html=True)
@@ -706,9 +771,9 @@ if page == "/ Lookup":
 # ═════════════════════════════════════════════════════════════════════════════
 elif page == "/ Phonetic Explorer":
     st.markdown('<div class="page-title">Phonetic Explorer</div>', unsafe_allow_html=True)
-    st.markdown('<div class="page-sub">Regular -ed rules · irregular vowel patterns</div>', unsafe_allow_html=True)
+    st.markdown('<div class="page-sub">Regular -ed rules · irregular vowel patterns · morphological groups</div>', unsafe_allow_html=True)
 
-    tab_reg, tab_irr = st.tabs(["Regular — -ed Rule", "Irregular — Vowel Patterns"])
+    tab_reg, tab_irr = st.tabs(["Regular — -ed Rule", "Irregular — Vowel & Structure Patterns"])
 
     with tab_reg:
         endings = df_reg['Ending'].value_counts()
@@ -755,46 +820,114 @@ elif page == "/ Phonetic Explorer":
         <div style="font-family:'DM Mono',monospace;font-size:0.76rem;color:#2E4060;
                     line-height:2;margin-bottom:0.5rem;">
           Irregular verbs form past tense through internal vowel change — never by adding -ed.
+          Two classification lenses: <b style="color:#DCE0EA;">vowel phonetics</b> (what sound changes)
+          and <b style="color:#DCE0EA;">morphological pattern</b> (how the three forms relate structurally).
         </div>
         """, unsafe_allow_html=True)
 
-        vc_counts = df_irreg['Vowel_Change'].value_counts()
-        cards = '<div class="p-grid">'
-        for pat, cnt in vc_counts.items():
-            ex = PATTERN_EXAMPLES.get(pat, "")
-            short = ex.split("·")[0].strip() if ex else ""
-            cards += f"""
-            <div class="p-card">
-              <div class="p-sym">{pat}</div>
-              <div class="p-cnt">{cnt}</div>
-              <div class="p-lbl">verbs</div>
-              <div class="p-ex">{short}</div>
-            </div>"""
-        cards += '</div>'
-        st.markdown(cards, unsafe_allow_html=True)
+        sub_vowel, sub_morph = st.tabs(["By Vowel Change", "By Morphological Pattern"])
 
-        st.markdown('<span class="sec-label">Filter by Pattern</span>', unsafe_allow_html=True)
-        opts = ["All patterns"] + vc_counts.index.tolist()
-        sel  = st.selectbox("", opts, label_visibility="collapsed", key="irr_sel")
+        # ── Vowel change sub-tab (original content) ────────────────────────
+        with sub_vowel:
+            vc_counts = df_irreg['Vowel_Change'].value_counts()
+            cards = '<div class="p-grid">'
+            for pat, cnt in vc_counts.items():
+                ex = PATTERN_EXAMPLES.get(pat, "")
+                short = ex.split("·")[0].strip() if ex else ""
+                cards += f"""
+                <div class="p-card">
+                  <div class="p-sym">{pat}</div>
+                  <div class="p-cnt">{cnt}</div>
+                  <div class="p-lbl">verbs</div>
+                  <div class="p-ex">{short}</div>
+                </div>"""
+            cards += '</div>'
+            st.markdown(cards, unsafe_allow_html=True)
 
-        df_sh = df_irreg if sel == "All patterns" else df_irreg[df_irreg['Vowel_Change'] == sel]
-        if sel != "All patterns" and sel in PATTERN_EXAMPLES:
-            st.markdown(f"""
-            <div style="font-family:'DM Mono',monospace;font-size:0.7rem;
-                        color:#1E3050;margin-bottom:0.6rem;">{PATTERN_EXAMPLES[sel]}</div>
-            """, unsafe_allow_html=True)
+            st.markdown('<span class="sec-label">Filter by Vowel Pattern</span>', unsafe_allow_html=True)
+            opts = ["All patterns"] + vc_counts.index.tolist()
+            sel  = st.selectbox("", opts, label_visibility="collapsed", key="irr_sel")
 
-        st.markdown(f'<span class="sec-label">{len(df_sh)} verbs</span>',
-                    unsafe_allow_html=True)
-        st.dataframe(
-            df_sh[['Base','Simple_Past','Past_Participle','IPA_Base','IPA_Past','Vowel_Change']
-                  ].reset_index(drop=True),
-            use_container_width=True, height=360
-        )
+            df_sh = df_irreg if sel == "All patterns" else df_irreg[df_irreg['Vowel_Change'] == sel]
+            if sel != "All patterns" and sel in PATTERN_EXAMPLES:
+                st.markdown(f"""
+                <div style="font-family:'DM Mono',monospace;font-size:0.7rem;
+                            color:#1E3050;margin-bottom:0.6rem;">{PATTERN_EXAMPLES[sel]}</div>
+                """, unsafe_allow_html=True)
+
+            st.markdown(f'<span class="sec-label">{len(df_sh)} verbs</span>', unsafe_allow_html=True)
+            st.dataframe(
+                df_sh[['Base','Simple_Past','Past_Participle','IPA_Base','IPA_Past','Vowel_Change']
+                      ].reset_index(drop=True),
+                use_container_width=True, height=360
+            )
+
+        # ── NEW: Morphological pattern sub-tab ────────────────────────────
+        with sub_morph:
+            mp_counts = df_irreg['Morph_Pattern'].value_counts()
+
+            # Summary cards
+            cards2 = '<div class="p-grid">'
+            for pat, cnt in mp_counts.items():
+                bc, color, desc, exs = MORPH_PATTERNS.get(pat, ('b-reg', C4, '', ''))
+                short_ex = exs.split("·")[0].strip() if exs else ""
+                cards2 += f"""
+                <div class="p-card">
+                  <div style="margin-bottom:0.4rem;">
+                    <span class="badge {bc}" style="font-size:0.6rem;">{pat}</span>
+                  </div>
+                  <div class="p-cnt" style="color:{color};">{cnt}</div>
+                  <div class="p-lbl">verbs</div>
+                  <div class="p-ex" style="margin-top:0.35rem;color:#2E4060;">{desc}</div>
+                  <div class="p-ex">{short_ex}</div>
+                </div>"""
+            cards2 += '</div>'
+            st.markdown(cards2, unsafe_allow_html=True)
+
+            # Expanded explanation for each pattern
+            st.markdown('<span class="sec-label">Pattern Definitions</span>', unsafe_allow_html=True)
+            for pat, (bc, color, desc, exs) in MORPH_PATTERNS.items():
+                count = mp_counts.get(pat, 0)
+                if count == 0:
+                    continue
+                st.markdown(f"""
+                <div class="card" style="margin-bottom:0.6rem;border-left:2px solid {color}33;">
+                  <div style="display:flex;align-items:baseline;gap:0.8rem;margin-bottom:0.45rem;">
+                    <span class="badge {bc}">{pat}</span>
+                    <span style="font-family:'DM Mono',monospace;font-size:0.65rem;color:{color};">
+                      {count} verbs
+                    </span>
+                    <span style="font-family:'DM Mono',monospace;font-size:0.65rem;color:#1E3050;">
+                      {desc}
+                    </span>
+                  </div>
+                  <div style="font-family:'DM Mono',monospace;font-size:0.7rem;
+                              color:#2E4060;line-height:2.1;">
+                    {exs}
+                  </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+            # Filter + table
+            st.markdown('<span class="sec-label">Filter by Morphological Pattern</span>',
+                        unsafe_allow_html=True)
+            mp_opts = ["All patterns"] + mp_counts.index.tolist()
+            mp_sel  = st.selectbox("", mp_opts, label_visibility="collapsed", key="morph_sel")
+
+            df_mp = df_irreg if mp_sel == "All patterns" \
+                             else df_irreg[df_irreg['Morph_Pattern'] == mp_sel]
+
+            st.markdown(f'<span class="sec-label">{len(df_mp)} verbs</span>', unsafe_allow_html=True)
+            st.dataframe(
+                df_mp[['Base','Simple_Past','Past_Participle',
+                       'IPA_Base','IPA_Past','Vowel_Change','Morph_Pattern']
+                      ].reset_index(drop=True),
+                use_container_width=True, height=380
+            )
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# PAGE 3 — PARTICIPIAL ADJECTIVES  (NEW)
+# PAGE 3 — PARTICIPIAL ADJECTIVES
 # ═════════════════════════════════════════════════════════════════════════════
 elif page == "/ Participial Adjectives":
     st.markdown('<div class="page-title">Participial Adjectives</div>', unsafe_allow_html=True)
@@ -802,7 +935,6 @@ elif page == "/ Participial Adjectives":
 
     sc_counts = df_part['Semantic_Class'].value_counts()
 
-    # Overview stats
     st.markdown(f"""
     <div class="stat-grid-4">
       <div class="stat-block">
@@ -832,7 +964,6 @@ elif page == "/ Participial Adjectives":
     </div>
     """, unsafe_allow_html=True)
 
-    # Key linguistic note
     st.markdown(f"""
     <div class="card" style="margin-bottom:1.5rem;">
       <div style="font-family:'DM Mono',monospace;font-size:0.62rem;letter-spacing:0.14em;
@@ -901,13 +1032,12 @@ elif page == "/ Charts":
     st.markdown('<div class="page-title">Charts & Analysis</div>', unsafe_allow_html=True)
     st.markdown(f'<div class="page-sub">Phonetic patterns across {len(df_reg)+len(df_irreg)} verbs + {len(df_part)} participial adjectives</div>', unsafe_allow_html=True)
 
-    t1, t2, t3, t4, t5 = st.tabs([
+    t1, t2, t3, t4, t5, t6 = st.tabs([
         "Overview", "-ed Endings", "Irregular Patterns",
-        "Verb Length", "Participial Adjectives"
+        "Morphological Groups", "Verb Length", "Participial Adjectives"
     ])
 
     with t1:
-        # ── 3-bar dataset overview + donut ────────────────────────────────
         fig, axes = plt.subplots(1, 2, figsize=(11, 4))
         for ax in axes: sax(ax, fig)
 
@@ -915,8 +1045,7 @@ elif page == "/ Charts":
         vals   = [len(df_reg), len(df_irreg), len(df_part)]
         colors = [C1, C2, C5]
 
-        axes[0].bar(cats, vals, color=colors, width=0.42,
-                    edgecolor=BG, linewidth=2.5)
+        axes[0].bar(cats, vals, color=colors, width=0.42, edgecolor=BG, linewidth=2.5)
         for i, (cat, val) in enumerate(zip(cats, vals)):
             axes[0].text(i, val + 1.5, str(val), ha='center',
                          fontweight='bold', fontsize=12, color='#8096B8')
@@ -971,12 +1100,62 @@ elif page == "/ Charts":
         ax.set_xlim(0, vc.max() + 5)
         for sp in ax.spines.values(): sp.set_visible(False)
         ax.tick_params(left=False)
-        ax.set_yticklabels(vc.index[::-1],
-                           fontfamily='monospace', fontsize=8.5, color=CT)
+        ax.set_yticklabels(vc.index[::-1], fontfamily='monospace', fontsize=8.5, color=CT)
         plt.tight_layout()
         st.pyplot(fig)
 
+    # ── NEW: Morphological groups chart ───────────────────────────────────
     with t4:
+        mp_counts = df_irreg['Morph_Pattern'].value_counts()
+        mp_colors = [MORPH_PATTERNS.get(k, ('b-reg', C1, '', ''))[1] for k in mp_counts.index]
+
+        fig, axes = plt.subplots(1, 2, figsize=(11, 4.5))
+        for ax in axes: sax(ax, fig)
+
+        axes[0].bar(range(len(mp_counts)), mp_counts.values,
+                    color=mp_colors, edgecolor=BG, linewidth=2, width=0.45)
+        for i, val in enumerate(mp_counts.values):
+            axes[0].text(i, val + 0.3, str(val), ha='center',
+                         fontweight='bold', fontsize=11, color='#8096B8')
+        axes[0].set_xticks(range(len(mp_counts)))
+        axes[0].set_xticklabels(
+            [k.replace(' ', '\n') for k in mp_counts.index],
+            fontfamily='monospace', fontsize=7.5, color=CT
+        )
+        axes[0].set_title('Irregular Verbs by Morphological Pattern', fontsize=10, pad=10)
+        axes[0].set_ylim(0, mp_counts.max() * 1.25)
+        for sp in axes[0].spines.values(): sp.set_visible(False)
+        axes[0].tick_params(bottom=False)
+
+        wedges, texts, autotexts = axes[1].pie(
+            mp_counts.values,
+            labels=[f'{k}  ({v})' for k, v in mp_counts.items()],
+            colors=mp_colors, autopct='%1.0f%%', startangle=90,
+            wedgeprops={'edgecolor': BG, 'linewidth': 3},
+            textprops={'color': CT, 'fontsize': 8, 'fontfamily': 'monospace'},
+            pctdistance=0.78
+        )
+        centre_circle = plt.Circle((0, 0), 0.55, fc='#0B1120')
+        axes[1].add_patch(centre_circle)
+        axes[1].text(0, 0, f'{len(df_irreg)}\nirregular', ha='center', va='center',
+                     fontsize=10, fontweight='bold', color='#DCE0EA', fontfamily='monospace')
+        axes[1].set_title('Morphological Pattern Distribution', fontsize=10, pad=10)
+
+        plt.tight_layout()
+        st.pyplot(fig)
+
+        st.markdown('<span class="sec-label">Cross-tabulation: Pattern × Vowel Change</span>',
+                    unsafe_allow_html=True)
+        cross = pd.crosstab(df_irreg['Morph_Pattern'], df_irreg['Vowel_Change'])
+        st.dataframe(cross, use_container_width=True, height=260)
+        st.markdown("""
+        <div style="font-family:'DM Mono',monospace;font-size:0.72rem;color:#1E3050;margin-top:0.4rem;line-height:2;">
+          Each cell = number of verbs sharing both a morphological pattern and a vowel change pattern.<br>
+          Tripartite verbs span the most vowel patterns — they are the most phonetically diverse group.
+        </div>
+        """, unsafe_allow_html=True)
+
+    with t5:
         df_reg['len']   = df_reg['Base'].str.len()
         df_irreg['len'] = df_irreg['Base'].str.len()
         fig, ax = plt.subplots(figsize=(10, 4))
@@ -997,15 +1176,13 @@ elif page == "/ Charts":
         st.pyplot(fig)
         st.markdown('<div style="font-family:\'DM Mono\',monospace;font-size:0.72rem;color:#1E3050;margin-top:0.4rem;">Irregular verbs are shorter on average — they derive from Old English. Modern coined verbs (google, zoom, tweet) are almost always regular.</div>', unsafe_allow_html=True)
 
-    with t5:
-        # ── Participial adjectives charts ─────────────────────────────────
+    with t6:
         sc_counts = df_part['Semantic_Class'].value_counts()
         sc_colors = [SC_COLOR.get(k, C5) for k in sc_counts.index]
 
         fig, axes = plt.subplots(1, 2, figsize=(11, 4.5))
         for ax in axes: sax(ax, fig)
 
-        # Bar chart
         axes[0].bar(range(len(sc_counts)), sc_counts.values,
                     color=sc_colors, edgecolor=BG, linewidth=2, width=0.45)
         for i, val in enumerate(sc_counts.values):
@@ -1021,7 +1198,6 @@ elif page == "/ Charts":
         for sp in axes[0].spines.values(): sp.set_visible(False)
         axes[0].tick_params(bottom=False)
 
-        # Donut chart
         wedges, texts, autotexts = axes[1].pie(
             sc_counts.values,
             labels=[f'{k}  ({v})' for k, v in sc_counts.items()],
@@ -1030,20 +1206,16 @@ elif page == "/ Charts":
             textprops={'color': CT, 'fontsize': 8, 'fontfamily': 'monospace'},
             pctdistance=0.78
         )
-        # Draw inner circle for donut effect
         centre_circle = plt.Circle((0, 0), 0.55, fc='#0B1120')
         axes[1].add_patch(centre_circle)
         axes[1].text(0, 0, f'{len(df_part)}\nadj', ha='center', va='center',
-                     fontsize=11, fontweight='bold',
-                     color='#DCE0EA', fontfamily='monospace')
+                     fontsize=11, fontweight='bold', color='#DCE0EA', fontfamily='monospace')
         axes[1].set_title('Participial Adj Distribution', fontsize=10, pad=10)
 
         plt.tight_layout()
         st.pyplot(fig)
 
-        # Second chart: overlap between verbs and participial adjectives
-        st.markdown('<span class="sec-label">Verb–Adjective Overlap</span>',
-                    unsafe_allow_html=True)
+        st.markdown('<span class="sec-label">Verb–Adjective Overlap</span>', unsafe_allow_html=True)
 
         part_bases = set(df_part['Base_Verb'].str.lower())
         reg_bases  = set(df_reg['Base'].str.lower())
@@ -1062,8 +1234,7 @@ elif page == "/ Charts":
         )
         for bar, val in zip(bars, [len(overlap_reg), len(overlap_irr), len(only_part)]):
             ax2.text(bar.get_width() + 0.2, bar.get_y() + bar.get_height() / 2,
-                     str(val), va='center', fontsize=10,
-                     fontweight='bold', color='#8096B8')
+                     str(val), va='center', fontsize=10, fontweight='bold', color='#8096B8')
         ax2.set_title('Participial Adj: Verb Source Overlap', fontsize=10, pad=10)
         ax2.set_xlim(0, max(len(overlap_reg), len(overlap_irr), len(only_part)) + 6)
         for sp in ax2.spines.values(): sp.set_visible(False)
@@ -1225,14 +1396,8 @@ elif page == "/ Model Performance":
     </div>
     """, unsafe_allow_html=True)
 
-
-# ═════════════════════════════════════════════════════════════════════════════
-# PAGE 6 — REFERENCE
-# ═════════════════════════════════════════════════════════════════════════════
-
-    # ── Misclassification Analysis ──────────────────────────────────────────────
-    st.markdown('<span class="sec-label">Misclassification Analysis</span>',
-                unsafe_allow_html=True)
+    # ── Misclassification Analysis ─────────────────────────────────────────
+    st.markdown('<span class="sec-label">Misclassification Analysis</span>', unsafe_allow_html=True)
 
     df_all_for_analysis = pd.concat([df_reg, df_irreg], ignore_index=True)
     X_analysis = extract_features(df_all_for_analysis)
@@ -1326,6 +1491,9 @@ elif page == "/ Model Performance":
                          use_container_width=True, height=min(n_fn * 38 + 40, 380))
 
 
+# ═════════════════════════════════════════════════════════════════════════════
+# PAGE 6 — REFERENCE
+# ═════════════════════════════════════════════════════════════════════════════
 elif page == "/ Reference":
     st.markdown('<div class="page-title">Verb Reference</div>', unsafe_allow_html=True)
     st.markdown(f'<div class="page-sub">Complete searchable table — {len(df_reg)+len(df_irreg)} verbs · {len(df_part)} participial adjectives</div>', unsafe_allow_html=True)
@@ -1345,23 +1513,28 @@ elif page == "/ Reference":
         )
 
     with t_i:
-        cs, cf = st.columns([2, 1])
+        cs, cf1, cf2 = st.columns([2, 1, 1])
         with cs:
             s2 = st.text_input("", placeholder="Search irregular verbs...", key="s_i")
-        with cf:
-            vc_opts = ["All patterns"] + df_irreg['Vowel_Change'].value_counts().index.tolist()
+        with cf1:
+            vc_opts = ["All vowel patterns"] + df_irreg['Vowel_Change'].value_counts().index.tolist()
             pf = st.selectbox("", vc_opts, key="ref_pf", label_visibility="collapsed")
+        with cf2:
+            mp_opts2 = ["All morph patterns"] + df_irreg['Morph_Pattern'].value_counts().index.tolist()
+            mp_f = st.selectbox("", mp_opts2, key="ref_mp", label_visibility="collapsed")
 
         df_sh2 = df_irreg.copy()
         if s2:
             df_sh2 = df_sh2[df_sh2['Base'].str.contains(s2.lower(), na=False)]
-        if pf != "All patterns":
+        if pf != "All vowel patterns":
             df_sh2 = df_sh2[df_sh2['Vowel_Change'] == pf]
+        if mp_f != "All morph patterns":
+            df_sh2 = df_sh2[df_sh2['Morph_Pattern'] == mp_f]
 
         st.markdown(f'<span class="sec-label">{len(df_sh2)} verbs</span>', unsafe_allow_html=True)
         st.dataframe(
             df_sh2[['Base','Simple_Past','Past_Participle',
-                    'IPA_Base','IPA_Past','Vowel_Change']].reset_index(drop=True),
+                    'IPA_Base','IPA_Past','Vowel_Change','Morph_Pattern']].reset_index(drop=True),
             use_container_width=True, height=520
         )
 
