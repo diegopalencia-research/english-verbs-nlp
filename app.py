@@ -506,10 +506,11 @@ def render_pattern_card(vowel_change: str) -> str:
                       letter-spacing:0.1em;margin-top:0.3rem;">{lbl}</div>
         </div>""")
 
-    arrow_sep = (
+    arrow_sep = ("""
         '<div style="font-family:\\'Noto Sans\\',sans-serif;font-size:1.2rem;'
         'color:#1A2E46;padding:0 0.4rem;align-self:flex-start;'
         'padding-top:0.35rem;">\u2192</div>'
+        """
     )
     arrow_row = arrow_sep.join(boxes)
 
