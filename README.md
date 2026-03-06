@@ -1,4 +1,4 @@
-# english-verbs-nlp
+# English Verb Phetics Patterns
 
 ---
 
@@ -6,7 +6,7 @@
 > *"Start" → /stɑːrt/ → started → /ɪd/*
 > *"Love" → /lʌv/ → loved → /d/*
 >
-> Why do these sound different? There's a rule. This app finds it — for any English verb.
+> Why do these sound different? There's a rule. This app finds it for any English verb.
 
 ---
 
