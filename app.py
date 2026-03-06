@@ -124,10 +124,10 @@ html, body, [class*="css"] {
 
 .badge {
     display: inline-block;
-    font-family: 'DM Mono', monospace;
+    font-family: 'Noto Sans', 'DM Mono', monospace;
     font-size: 0.68rem;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    text-transform: none;
     padding: 0.22rem 0.65rem;
     border-radius: 2px;
     margin-right: 0.4rem;
@@ -506,11 +506,10 @@ def render_pattern_card(vowel_change: str) -> str:
                       letter-spacing:0.1em;margin-top:0.3rem;">{lbl}</div>
         </div>""")
 
-    arrow_sep = ("""
-        '<div style="font-family:\\'Noto Sans\\',sans-serif;font-size:1.2rem;'
-        'color:#1A2E46;padding:0 0.4rem;align-self:flex-start;'
-        'padding-top:0.35rem;">\u2192</div>'
-        """
+    arrow_sep = (
+        '<div style="font-size:1.2rem;color:#1A2E46;'
+        'padding:0 0.4rem;align-self:flex-start;padding-top:0.3rem;">'
+        '&#8594;</div>'
     )
     arrow_row = arrow_sep.join(boxes)
 
@@ -537,7 +536,7 @@ def render_pattern_card(vowel_change: str) -> str:
 
     ex_html = (
         '<div style="display:flex;flex-wrap:wrap;gap:0.8rem 1.4rem;'
-        'font-family:\'DM Mono\',monospace;margin-top:0.15rem;">'
+        'font-family:DM Mono,monospace;margin-top:0.15rem;">'
         + ''.join(ex_parts)
         + '</div>'
     )
