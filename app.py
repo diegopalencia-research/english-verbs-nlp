@@ -496,21 +496,14 @@ def render_pattern_card(vowel_change: str) -> str:
     boxes = []
     for i, (sym, lbl) in enumerate(zip(parts, labels)):
         sym_color = '#DCE0EA' if i == 0 else color
-        boxes.append(f"""
-        <div style="text-align:center;min-width:60px;">
-          <div style="font-family:'Noto Sans','Segoe UI',Arial,sans-serif;
-                      font-size:1.75rem;font-weight:600;
-                      color:{sym_color};line-height:1.1;">{sym}</div>
-          <div style="font-family:'DM Mono',monospace;font-size:0.52rem;
-                      color:#1A2E46;text-transform:uppercase;
-                      letter-spacing:0.1em;margin-top:0.3rem;">{lbl}</div>
-        </div>""")
+        boxes.append(
+            '<div style="text-align:center;min-width:60px;">'
+            f'<div style="font-family:Noto Sans,Segoe UI,Arial,sans-serif;font-size:1.75rem;font-weight:600;color:{sym_color};line-height:1.1;">{sym}</div>'
+            f'<div style="font-family:DM Mono,monospace;font-size:0.52rem;color:#1A2E46;text-transform:uppercase;letter-spacing:0.1em;margin-top:0.3rem;">{lbl}</div>'
+            '</div>'
+        )
 
-    arrow_sep = (
-        '<div style="font-size:1.2rem;color:#1A2E46;'
-        'padding:0 0.4rem;align-self:flex-start;padding-top:0.3rem;">'
-        '&#8594;</div>'
-    )
+    arrow_sep = '<div style="font-size:1.2rem;color:#1A2E46;padding:0 0.4rem;align-self:flex-start;padding-top:0.3rem;">&#8594;</div>'
     arrow_row = arrow_sep.join(boxes)
 
     # ── Build example pairs/trios ────────────────────────────────────────
