@@ -12,7 +12,7 @@
 
 ## The Problem
 
-English past tense pronunciation follows a hidden phonetic rule that most learners — and most teachers — never make explicit. The -ed suffix has three distinct sounds, and which one applies is determined entirely by the final **phoneme** of the base verb, not the final letter.
+English past tense pronunciation follows a hidden phonetic rule that most learners (and most teachers) never make explicit. The -ed suffix has three distinct sounds, and which one applies is determined entirely by the final **phoneme** of the base verb, not the final letter.
 
 This system makes that logic searchable, audible, and machine-verifiable. It is grounded in Chomsky & Halle (1968) and validated with a trained Random Forest classifier on a custom 473-entry dataset.
 
@@ -28,7 +28,7 @@ This system makes that logic searchable, audible, and machine-verifiable. It is 
 - **Irregular verbs are shorter on average** — reflecting Old English monosyllabic roots. The 10 most frequent English verbs are all irregular
 - **Emotional state** is the largest participial adjective class (24 of 76 entries) — *excited, bored, exhausted, worried* — all describe the experiencer, not a physical condition
 - **33% of the dataset is irregular** — yet most new English verbs coined after 1900 are regular. Frequency, not age, predicts irregularity
-- The **Random Forest reaches ~75% accuracy** distinguishing regular from irregular verbs using spelling features alone — outperforming the 54% majority-class baseline by 21 percentage points
+- The **Random Forest reaches ~75% accuracy** distinguishing regular from irregular verbs using spelling features alone (outperforming the 54% majority) class baseline by 21 percentage points
 - **Top predictive features:** second-to-last character · verb length · consonant count · vowel count · last letter. Etymology is not a feature — this is the main source of remaining error
 
 ---
@@ -52,7 +52,7 @@ This system makes that logic searchable, audible, and machine-verifiable. It is 
 
 ## The -ed Rule
 
-When a regular verb takes **-ed**, pronunciation is determined by the **final sound** of the base form — not the final letter:
+When a regular verb takes **-ed**, pronunciation is determined by the **final sound** of the base form not the final letter:
 
 | Final Sound | -ed Pronounced As | Example |
 |---|---|---|
@@ -84,7 +84,7 @@ Irregular verbs are now classified along two independent axes:
 | aɪ → ɔː | buy/bought · fight/fought · catch/caught |
 | oʊ → uː | know/knew · grow/grew · throw/threw |
 
-Each pattern includes a **visual arrow diagram** (iː → ɛ), spelling rule, plain-language explanation, examples, and a memory tip — shown inline in the Lookup page whenever an irregular verb is found.
+Each pattern includes a **visual arrow diagram** (iː → ɛ), spelling rule, plain-language explanation, examples, and a memory tip shown inline in the Lookup page whenever an irregular verb is found.
 
 ### 2. Morphological Pattern (structural — how the three forms relate)
 
@@ -288,7 +288,7 @@ SUPABASE_KEY = "your-anon-key"
 
 ## Why the Model Fails (~25%)
 
-The classifier uses spelling features only — it has no access to etymology. Short CVC verbs like *cut*, *put*, *hit*, *set* look identical to regular verbs from orthography alone but are irregular. Adding etymology features (Old English vs Latin/French origin) would likely push accuracy above 85%. This is the stated next research direction.
+The classifier uses spelling features only it has no access to etymology. Short CVC verbs like *cut*, *put*, *hit*, *set* look identical to regular verbs from orthography alone but are irregular. Adding etymology features (Old English vs Latin/French origin) would likely push accuracy above 85%. This is the stated next research direction.
 
 ---
 
@@ -315,39 +315,12 @@ supabase>=2.0
 - **Pinker & Prince (1988)** — rule/exception distinction motivating the classification task
 - **Berko (1958)** — Wug test — productive morphological rule application in English
 
-This dashboard operationalizes findings from:
-> *Palencia, D. (2024). Computational Feature Extraction for Human Performance Prediction. OSF Preprints.*
-
----
-
-**Live App:** https://english-verbs-nlp.streamlit.app/
-&nbsp;&nbsp;·&nbsp;&nbsp;
-**GitHub:** github.com/diegopalencia-research/english-verbs-nlp
-
----
-
-## Author
-
-**Diego José Palencia Robles**
-*Data Science & NLP Projects — Applied AI & Analytics + Machine Learning*
-
-- GitHub; @diegopalencia-research: https://github.com/diegopalencia-research
-- LinkedIn: https://www.linkedin.com/in/diego-jose-palencia-robles/
-
----
-
-## License
-
-MIT License
-
 ---
 
 ## Research Connection
 
 This dashboard operationalizes findings from:
-> *Palencia, D. (2024). Computational Feature Extraction for Human Performance Prediction. OSF Preprints.*
-
-The call center context serves as an empirical domain for testing whether temporal and behavioral operational features can predict quality outcomes at the individual agent level — a research question extending the phonological prediction framework from Project 01.
+> *Palencia, D. (2026). Computational Feature Extraction for Human Performance Prediction. OSF Preprints.*
 
 ---
 
@@ -368,4 +341,3 @@ The call center context serves as an empirical domain for testing whether tempor
 ## License
 
 MIT License
-
