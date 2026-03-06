@@ -20,16 +20,16 @@ This system makes that logic searchable, audible, and machine-verifiable. It is 
 
 ## Key Findings
 
-- **47.5%** of regular verbs follow the `/d/` ending (~151 of 317) — the most common past tense sound, produced by voiced consonants and vowels
-- **28.1%** follow `/t/` (~89 verbs) — voiceless consonants: walk → walkt, cook → cookt, push → pusht
-- **24.4%** follow `/ɪd/` (~77 verbs) — verbs ending in /t/ or /d/ must insert an extra syllable: start → startid
-- The most frequent irregular pattern is **"no vowel change"** (cut/cut, put/put, hit/hit) — these look regular but aren't
-- Second most frequent irregular pattern: **iː → ɛ** (feel/felt, keep/kept, sleep/slept) — 19 verbs
-- **Irregular verbs are shorter on average** — reflecting Old English monosyllabic roots. The 10 most frequent English verbs are all irregular
-- **Emotional state** is the largest participial adjective class (24 of 76 entries) — *excited, bored, exhausted, worried* — all describe the experiencer, not a physical condition
-- **33% of the dataset is irregular** — yet most new English verbs coined after 1900 are regular. Frequency, not age, predicts irregularity
+- **47.5%** of regular verbs follow the `/d/` ending (~151 of 317) the most common past tense sound, produced by voiced consonants and vowels
+- **28.1%** follow `/t/` (~89 verbs) voiceless consonants: walk → walkt, cook → cookt, push → pusht
+- **24.4%** follow `/ɪd/` (~77 verbs) verbs ending in /t/ or /d/ must insert an extra syllable: start → startid
+- The most frequent irregular pattern is **"no vowel change"** (cut/cut, put/put, hit/hit) these look regular but aren't
+- Second most frequent irregular pattern: **iː → ɛ** (feel/felt, keep/kept, sleep/slept) 19 verbs
+- **Irregular verbs are shorter on average** reflecting Old English monosyllabic roots. The 10 most frequent English verbs are all irregular
+- **Emotional state** is the largest participial adjective class (24 of 76 entries) *excited, bored, exhausted, worried* all describe the experiencer, not a physical condition
+- **33% of the dataset is irregular** yet most new English verbs coined after 1900 are regular. Frequency, not age, predicts irregularity
 - The **Random Forest reaches ~75% accuracy** distinguishing regular from irregular verbs using spelling features alone (outperforming the 54% majority) class baseline by 21 percentage points
-- **Top predictive features:** second-to-last character · verb length · consonant count · vowel count · last letter. Etymology is not a feature — this is the main source of remaining error
+- **Top predictive features:** second-to-last character · verb length · consonant count · vowel count · last letter. Etymology is not a feature this is the main source of remaining error
 
 ---
 
@@ -327,6 +327,8 @@ This dashboard operationalizes findings from:
 **Live App:** https://english-verbs-nlp.streamlit.app/
 &nbsp;&nbsp;·&nbsp;&nbsp;
 **GitHub:** github.com/diegopalencia-research/english-verbs-nlp
+
+---
 
 ## Author
 
