@@ -1,3 +1,4 @@
+from services.auto_lookup import auto_lookup, log_search
 import os
 import sys
 import json
