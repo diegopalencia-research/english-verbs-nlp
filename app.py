@@ -1,4 +1,3 @@
-from services.auto_lookup import auto_lookup, log_search
 import os
 import sys
 import json
@@ -24,6 +23,7 @@ from services.lemmatizer    import find_verb, suggest_verbs
 from services.preprocessing import extract_features, count_syllables, get_phonetic_category
 from services.phonetics     import (predict_ending, get_rule_explanation,
                                     get_semantic_class_info, adjective_test)
+from services.auto_lookup   import auto_lookup, log_search
 
 # ── Page config ────────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -778,6 +778,9 @@ if page == "/ Lookup":
     else:
         row, verb_type, matched_form = find_verb(verb_input, df_reg, df_irreg, df_part)
 
+        if row is not None:
+            log_search(verb_input, found=True, verb_type=verb_type, matched_as=matched_form)
+
         if row is not None and verb_type == 'Participial Adjective':
             sc   = row['Semantic_Class']
             bc   = SC_BADGE.get(sc, 'b-part')
@@ -1013,71 +1016,86 @@ if page == "/ Lookup":
                 """, unsafe_allow_html=True)
 
         else:
-            # ── Not in dataset — ML prediction ────────────────────────────
-            st.markdown('<span class="sec-label">Not in dataset — ML Prediction</span>',
-                        unsafe_allow_html=True)
+            # ── Not in dataset — Supabase + API + ML pipeline ─────────────
+            result   = auto_lookup(
+                verb_input, model,
+                extract_features, predict_ending,
+                get_rule_explanation, get_phonetic_category, count_syllables,
+            )
+            label    = result['label']
+            conf     = result['confidence']
+            phon_cat = result['phonetic_cat']
+            sylls    = result['syllables']
+            source   = result['source']
+            phonetic = result['phonetic']
+            defn     = result['definition']
 
-            row_df   = pd.DataFrame([{'Base': verb_input}])
-            features = extract_features(row_df)
-            prob     = model.predict_proba(features)[0]
-            label    = 'Irregular' if prob[1] > 0.5 else 'Regular'
-            conf     = max(prob) * 100
-
-            phon_cat = get_phonetic_category(verb_input)
-            sylls    = count_syllables(verb_input)
+            src_map  = {'cache': ('Cached', '#7DCBA8'),
+                        'api':   ('Dictionary API', '#5B9EC9'),
+                        'ml_only': ('ML only', '#C9A84C')}
+            src_text, src_color = src_map.get(source, ('ML Prediction', '#C9A84C'))
 
             speak_button(verb_input, f"Hear '{verb_input}'", f"pred_{verb_input}")
 
+            phonetic_line = (f'<div style="font-family:Noto Sans,sans-serif;font-size:0.85rem;'
+                             f'color:#5B9EC9;margin-top:0.35rem;">{phonetic}</div>') if phonetic else ''
+            defn_line     = (f'<div style="font-family:DM Mono,monospace;font-size:0.63rem;'
+                             f'color:#3A5070;margin-top:0.5rem;font-style:italic;">{defn}</div>') if defn else ''
+
             if label == 'Regular':
-                predicted_ending = predict_ending(verb_input)
+                predicted_ending = result['predicted_ending'] or predict_ending(verb_input)
                 rule_text = get_rule_explanation(predicted_ending)
-                badge_map = {'/t/': 'b-t', '/d/': 'b-d', '/ɪd/': 'b-id'}
+                badge_map = {'/t/': 'b-t', '/d/': 'b-d', '/\u026ad/': 'b-id'}
                 bc = badge_map.get(predicted_ending, 'b-reg')
-                st.markdown(f"""
-                <div class="card">
-                  <div style="display:flex;align-items:baseline;gap:0.8rem;margin-bottom:0.7rem;">
-                    <span class="badge b-reg">Regular</span>
-                    <span style="font-family:'DM Mono',monospace;font-size:0.65rem;
-                                 color:#1E3050;">{conf:.1f}% confidence</span>
-                  </div>
-                  <div style="font-family:'Syne',sans-serif;font-size:1.4rem;
-                              font-weight:700;color:{C4};">
-                    {verb_input} &rarr; {verb_input}ed
-                  </div>
-                  <div style="margin-top:0.6rem;">
-                    <span class="badge {bc}">{predicted_ending}</span>
-                    <span style="font-family:'DM Mono',monospace;font-size:0.72rem;
-                                 color:#3A5070;">{rule_text}</span>
-                  </div>
-                  <div style="font-family:'DM Mono',monospace;font-size:0.63rem;
-                              color:#1A2E46;margin-top:0.8rem;line-height:1.9;">
-                    Phonetic category: {phon_cat} &nbsp;&middot;&nbsp;
-                    Syllables: {sylls} &nbsp;&middot;&nbsp;
-                    Last letter: {verb_input[-1]}
-                  </div>
-                </div>
-                """, unsafe_allow_html=True)
+                conf_str = f"{conf:.1f}"
+                card_html = (
+                    '<div class="card">'
+                    f'<div style="display:flex;align-items:baseline;gap:0.8rem;margin-bottom:0.7rem;">'
+                    f'<span class="badge b-reg">Regular</span>'
+                    f'<span style="font-family:DM Mono,monospace;font-size:0.65rem;color:#1E3050;">{conf_str}% confidence</span>'
+                    f'<span style="font-family:DM Mono,monospace;font-size:0.58rem;color:{src_color};margin-left:auto;">{src_text}</span>'
+                    f'</div>'
+                    f'<div style="font-family:Syne,sans-serif;font-size:1.4rem;font-weight:700;color:{C4};">'
+                    f'{verb_input} &rarr; {verb_input}ed</div>'
+                    + phonetic_line +
+                    f'<div style="margin-top:0.6rem;">'
+                    f'<span class="badge {bc}">{predicted_ending}</span>'
+                    f'<span style="font-family:DM Mono,monospace;font-size:0.72rem;color:#3A5070;">{rule_text}</span>'
+                    f'</div>'
+                    + defn_line +
+                    f'<div style="font-family:DM Mono,monospace;font-size:0.63rem;color:#1A2E46;margin-top:0.8rem;line-height:1.9;">'
+                    f'Phonetic category: {phon_cat} &nbsp;&middot;&nbsp; '
+                    f'Syllables: {sylls} &nbsp;&middot;&nbsp; '
+                    f'Last letter: {verb_input[-1]}'
+                    f'</div>'
+                    '</div>'
+                )
+                st.markdown(card_html, unsafe_allow_html=True)
+                speak_button(f"{verb_input}ed", f"Hear '{verb_input}ed'", f"pred_past_{verb_input}")
+            else:
+                conf_str = f"{conf:.1f}"
+                card_html = (
+                    '<div class="card">'
+                    f'<div style="display:flex;align-items:baseline;gap:0.8rem;margin-bottom:0.7rem;">'
+                    f'<span class="badge b-irr">Likely Irregular</span>'
+                    f'<span style="font-family:DM Mono,monospace;font-size:0.65rem;color:#1E3050;">{conf_str}% confidence</span>'
+                    f'<span style="font-family:DM Mono,monospace;font-size:0.58rem;color:{src_color};margin-left:auto;">{src_text}</span>'
+                    f'</div>'
+                    f'<div style="font-family:Syne,sans-serif;font-size:1.4rem;font-weight:700;color:{C2};">{verb_input}</div>'
+                    + phonetic_line +
+                    '<div style="font-family:DM Mono,monospace;font-size:0.78rem;color:#4A6280;line-height:1.85;margin-top:0.5rem;">'
+                    'This verb likely has an unpredictable past form.<br>'
+                    'Check a dictionary for the correct conjugation.</div>'
+                    + defn_line +
+                    f'<div style="font-family:DM Mono,monospace;font-size:0.63rem;color:#1A2E46;margin-top:0.8rem;">'
+                    f'Phonetic category: {phon_cat} &nbsp;&middot;&nbsp; Syllables: {sylls}'
+                    f'</div>'
+                    '</div>'
+                )
+                st.markdown(card_html, unsafe_allow_html=True)
                 speak_button(f"{verb_input}ed", f"Hear '{verb_input}ed'",
                              f"pred_past_{verb_input}")
-            else:
-                st.markdown(f"""
-                <div class="card">
-                  <div style="display:flex;align-items:baseline;gap:0.8rem;margin-bottom:0.7rem;">
-                    <span class="badge b-irr">Likely Irregular</span>
-                    <span style="font-family:'DM Mono',monospace;font-size:0.65rem;
-                                 color:#1E3050;">{conf:.1f}% confidence</span>
-                  </div>
-                  <div style="font-family:'DM Mono',monospace;font-size:0.78rem;
-                              color:#4A6280;line-height:1.85;">
-                    This verb likely has an unpredictable past form.<br>
-                    Check a dictionary for the correct conjugation.
-                  </div>
-                  <div style="font-family:'DM Mono',monospace;font-size:0.63rem;
-                              color:#1A2E46;margin-top:0.8rem;">
-                    Phonetic category: {phon_cat} &nbsp;&middot;&nbsp; Syllables: {sylls}
-                  </div>
-                </div>
-                """, unsafe_allow_html=True)
+
 
 
 # ═════════════════════════════════════════════════════════════════════════════
