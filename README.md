@@ -333,7 +333,7 @@ This dashboard operationalizes findings from:
 ## Author
 
 **Diego José Palencia Robles**
-*Data Science & NLP Projects — Applied AI & Analytics + Machine Learning*
+*Data Science & NLP Projects - Applied AI & Analytics + Machine Learning*
 
 - GitHub; @diegopalencia-research: https://github.com/diegopalencia-research
 - LinkedIn: https://www.linkedin.com/in/diego-jose-palencia-robles/
