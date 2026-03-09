@@ -277,6 +277,7 @@ streamlit run app.py
 python -m pytest tests/ -v
 ```
 
+```
 For Supabase auto-add, create `.streamlit/secrets.toml`:
 
 [supabase]
