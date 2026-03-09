@@ -733,7 +733,8 @@ with st.sidebar:
         "/ Participial Adjectives",
         "/ Charts",
         "/ Model Performance",
-        "/ Reference"
+        "/ Reference",
+        "/ Discovered Verbs"
     ], label_visibility="collapsed")
 
     total_verbs = len(df_reg) + len(df_irreg)
@@ -1861,3 +1862,159 @@ elif page == "/ Reference":
                     'Semantic_Class','Example_Phrase','Notes']].reset_index(drop=True),
             use_container_width=True, height=520
         )
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# PAGE 7 — DISCOVERED VERBS
+# ═════════════════════════════════════════════════════════════════════════════
+elif page == "/ Discovered Verbs":
+    st.markdown('<div class="page-title">Discovered Verbs</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="page-sub">Verbs found through user searches — not in the original dataset</div>',
+        unsafe_allow_html=True
+    )
+
+    from services.auto_lookup import get_supabase, get_top_searched, get_search_stats
+
+    client = get_supabase()
+
+    # ── Stats bar ────────────────────────────────────────────────────────────
+    stats = get_search_stats()
+    st.markdown(f"""
+<div style="display:flex;gap:1.2rem;flex-wrap:wrap;margin-bottom:1.6rem;">
+<div class="stat-block" style="min-width:120px;">
+<div class="stat-num" style="color:{C1};">{stats["total"]}</div>
+<div class="stat-lbl">Total searches</div>
+</div>
+<div class="stat-block" style="min-width:120px;">
+<div class="stat-num" style="color:{C4};">{stats["found"]}</div>
+<div class="stat-lbl">Found in dataset</div>
+</div>
+<div class="stat-block" style="min-width:120px;">
+<div class="stat-num" style="color:{C2};">{stats["not_found"]}</div>
+<div class="stat-lbl">Not in dataset</div>
+</div>
+<div class="stat-block" style="min-width:120px;">
+<div class="stat-num" style="color:{C5};">{stats["unique_new"]}</div>
+<div class="stat-lbl">Unique new verbs</div>
+</div>
+</div>
+""", unsafe_allow_html=True)
+
+    if client is None:
+        st.markdown('''
+<div class="card" style="border-color:#C9A84C33;border-left-color:#C9A84C;">
+<div style="font-family:DM Mono,monospace;font-size:0.75rem;color:#C9A84C;">
+Supabase not connected — add credentials to .streamlit/secrets.toml to enable this page.
+</div>
+</div>''', unsafe_allow_html=True)
+    else:
+        tab_new, tab_log = st.tabs(["New Verbs Discovered", "Search Log"])
+
+        # ── Tab 1: pending_verbs ──────────────────────────────────────────────
+        with tab_new:
+            try:
+                result = (
+                    client.table("pending_verbs")
+                    .select("verb, search_count, ml_label, ml_conf, predicted_ending, added_at")
+                    .order("added_at", desc=True)
+                    .execute()
+                )
+                rows = result.data or []
+
+                if not rows:
+                    st.markdown(
+                        '<div style="font-family:DM Mono,monospace;font-size:0.75rem;' +
+                        'color:#1A2E46;padding:1rem 0;">No new verbs discovered yet.' +
+                        ' Search something not in the dataset to add the first one.</div>',
+                        unsafe_allow_html=True
+                    )
+                else:
+                    df_disc = pd.DataFrame(rows)
+                    df_disc.columns = ["Verb", "Searches", "ML Label", "Confidence %",
+                                       "Predicted Ending", "Added At"]
+                    df_disc["Added At"] = _pd.to_datetime(
+                        df_disc["Added At"]).dt.strftime("%Y-%m-%d %H:%M")
+
+                    # Summary pills
+                    reg_count  = (df_disc["ML Label"] == "Regular").sum()
+                    irr_count  = (df_disc["ML Label"] == "Irregular").sum()
+                    total_disc = len(df_disc)
+                    st.markdown(f"""
+<div style="display:flex;gap:0.8rem;margin-bottom:1rem;flex-wrap:wrap;">
+<span class="badge b-reg">{reg_count} Regular</span>
+<span class="badge b-irr">{irr_count} Irregular</span>
+<span style="font-family:DM Mono,monospace;font-size:0.65rem;color:#1A2E46;
+             align-self:center;">{total_disc} total discovered</span>
+</div>
+""", unsafe_allow_html=True)
+
+                    # Filter
+                    col_s, col_f = st.columns([3, 1])
+                    with col_s:
+                        search_disc = st.text_input(
+                            "", placeholder="Filter verbs...", key="disc_search")
+                    with col_f:
+                        label_f = st.selectbox(
+                            "", ["All", "Regular", "Irregular"],
+                            key="disc_label", label_visibility="collapsed")
+
+                    df_show = df_disc.copy()
+                    if search_disc:
+                        df_show = df_show[
+                            df_show["Verb"].str.contains(search_disc.lower(), na=False)]
+                    if label_f != "All":
+                        df_show = df_show[df_show["ML Label"] == label_f]
+
+                    st.markdown(
+                        f'<span class="sec-label">{len(df_show)} verbs</span>',
+                        unsafe_allow_html=True
+                    )
+                    st.dataframe(df_show.reset_index(drop=True),
+                                 use_container_width=True, height=480)
+
+            except Exception as e:
+                st.markdown(
+                    f'<div style="font-family:DM Mono,monospace;font-size:0.72rem;' +
+                    f'color:#C97080;">Error loading data: {e}</div>',
+                    unsafe_allow_html=True
+                )
+
+        # ── Tab 2: search_logs ────────────────────────────────────────────────
+        with tab_log:
+            try:
+                log_result = (
+                    client.table("search_logs")
+                    .select("verb, found, verb_type, matched_as, searched_at")
+                    .order("searched_at", desc=True)
+                    .limit(200)
+                    .execute()
+                )
+                log_rows = log_result.data or []
+
+                if not log_rows:
+                    st.markdown(
+                        '<div style="font-family:DM Mono,monospace;font-size:0.75rem;' +
+                        'color:#1A2E46;padding:1rem 0;">No searches logged yet.</div>',
+                        unsafe_allow_html=True
+                    )
+                else:
+                    df_log = pd.DataFrame(log_rows)
+                    df_log.columns = ["Verb", "Found", "Type", "Matched As", "Searched At"]
+                    df_log["Searched At"] = _pd2.to_datetime(
+                        df_log["Searched At"]).dt.strftime("%Y-%m-%d %H:%M")
+                    df_log["Found"] = df_log["Found"].map({True: "Yes", False: "No"})
+
+                    st.markdown(
+                        f'<span class="sec-label">Last {len(df_log)} searches</span>',
+                        unsafe_allow_html=True
+                    )
+                    st.dataframe(df_log.reset_index(drop=True),
+                                 use_container_width=True, height=520)
+
+            except Exception as e:
+                st.markdown(
+                    f'<div style="font-family:DM Mono,monospace;font-size:0.72rem;' +
+                    f'color:#C97080;">Error loading log: {e}</div>',
+                    unsafe_allow_html=True
+                )
