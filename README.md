@@ -1,4 +1,4 @@
-# English Verb Phetics Patterns
+# English Verb Phonetics Patterns
 
 ---
 
@@ -279,9 +279,9 @@ python -m pytest tests/ -v
 
 For Supabase auto-add, create `.streamlit/secrets.toml`:
 
-```toml
-SUPABASE_URL = "https://your-project.supabase.co"
-SUPABASE_KEY = "your-anon-key"
+[supabase]
+url = "https://your-project.supabase.co"
+key = "your-anon-key"
 ```
 
 ---
