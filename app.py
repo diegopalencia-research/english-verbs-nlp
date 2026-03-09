@@ -1933,7 +1933,7 @@ Supabase not connected — add credentials to .streamlit/secrets.toml to enable 
                     df_disc = pd.DataFrame(rows)
                     df_disc.columns = ["Verb", "Searches", "ML Label", "Confidence %",
                                        "Predicted Ending", "Added At"]
-                    df_disc["Added At"] = _pd.to_datetime(
+                    df_disc["Added At"] = pd.to_datetime(
                         df_disc["Added At"]).dt.strftime("%Y-%m-%d %H:%M")
 
                     # Summary pills
@@ -2001,7 +2001,7 @@ Supabase not connected — add credentials to .streamlit/secrets.toml to enable 
                 else:
                     df_log = pd.DataFrame(log_rows)
                     df_log.columns = ["Verb", "Found", "Type", "Matched As", "Searched At"]
-                    df_log["Searched At"] = _pd2.to_datetime(
+                    df_log["Searched At"] = pd.to_datetime(
                         df_log["Searched At"]).dt.strftime("%Y-%m-%d %H:%M")
                     df_log["Found"] = df_log["Found"].map({True: "Yes", False: "No"})
 
